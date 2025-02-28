@@ -7,9 +7,11 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+  <!-- 主容器 -->
   <div class="container">
     <h1>Never Ending Drum Party</h1>
     
+    <!-- 鼓陣列格子 -->
     <div class="drum-grid" id="drumGrid">
       <div class="grid-cell" id="cell-top-left"></div>
       <div class="grid-cell" id="cell-top-center"></div>
@@ -24,7 +26,9 @@
       <div class="grid-cell" id="cell-bottom-right"></div>
     </div>
     
+    <!-- 控制區域 -->
     <div class="controls">
+      <!-- 鼓種選擇 -->
       <div class="drum-selection">
         <h3>選擇你的鼓:</h3>
         <select id="drumSelect">
@@ -36,6 +40,7 @@
         </select>
       </div>
       
+      <!-- 按鍵說明 -->
       <div class="instructions">
         <h3>按鍵說明:</h3>
         <ul>
@@ -47,18 +52,36 @@
         </ul>
       </div>
       
+      <!-- 狀態顯示 -->
       <div class="status">
         <p id="connectionStatus">連接中...</p>
         <p id="roomInfo">房間: 默認房間</p>
       </div>
     </div>
   </div>
+
+  <!-- 音頻啟動模態框 -->
+  <div id="audioStartModal" class="modal">
+    <div class="modal-content">
+      <h2>Never Ending Drum Party</h2>
+      <p>點擊以啟動音頻</p>
+      <button id="startAudioBtn">開始</button>
+    </div>
+  </div>
+
+  <!-- 音頻啟動腳本 -->
+  <script>
+    document.getElementById('startAudioBtn').addEventListener('click', function() {
+      document.getElementById('audioStartModal').style.display = 'none';
+    });
+  </script>
   
-  <!-- 腳本加載 -->
+  <!-- 依賴腳本 -->
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/audio.js"></script>
   <script src="/js/socket.js"></script>
   <script src="/js/ui.js"></script>
   <script src="/js/main.js"></script>
+
 </body>
 </html>

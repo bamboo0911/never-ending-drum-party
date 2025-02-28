@@ -1,53 +1,88 @@
-// Socket 連接管理模組
+// Simplified Socket Manager
 const SocketManager = (function() {
-    // Socket.io 實例
+    // Socket.io instance
     let socket;
-    // 當前用戶資訊
+    // Current user info
     const currentUser = {
       id: 'user-' + Math.floor(Math.random() * 10000),
       position: 'bottom-center', 
       drumType: 'kick'
     };
-    // 當前房間資訊
+    // Current room info
     const currentRoom = {
       id: 'default-room'
     };
-    // 事件監聽器
+    // Event listeners
     const eventListeners = {};
-    // 時間同步 Promise 解析器
-    let timePromiseResolve = null;
+    // Connection status
+    let isConnected = false;
+    // Reconnection settings
+    const MAX_RECONNECT_ATTEMPTS = 3;
+    let reconnectAttempts = 0;
+    let reconnectTimeout = null;
   
-    // 初始化 Socket.io 連接
+    /**
+     * Initialize Socket.io connection
+     * @returns {Promise} Resolution indicates success
+     */
     function init() {
       return new Promise((resolve, reject) => {
         try {
-          // 創建連接
+          // Check if Socket.io is loaded
+          if (typeof io === 'undefined') {
+            console.error('[Socket] Socket.io 未加載');
+            updateConnectionStatus('Socket.io 未加載', false);
+            reject(new Error('Socket.io not loaded'));
+            return;
+          }
+          
+          // Create connection
           socket = io();
           
-          // 連接建立成功
+          // Connection successful
           socket.on('connect', () => {
             console.log('[Socket] 已連接到服務器');
             updateConnectionStatus('已連接', true);
+            isConnected = true;
+            reconnectAttempts = 0;
             
-            // 加入默認房間
+            // Join default room
             joinRoom(currentRoom.id);
             resolve(true);
           });
           
-          // 連接出錯
+          // Connection error
           socket.on('connect_error', (error) => {
             console.error('[Socket] 連接錯誤:', error);
             updateConnectionStatus('連接失敗', false);
-            reject(error);
+            
+            // Try to reconnect
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+              reconnectAttempts++;
+              updateConnectionStatus(`連接失敗，重試中 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`, false);
+              
+              // Clear existing timeout
+              if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+              }
+              
+              // Set new timeout
+              reconnectTimeout = setTimeout(() => {
+                socket.connect();
+              }, 2000);
+            } else {
+              reject(error);
+            }
           });
           
-          // 斷開連接
+          // Disconnection
           socket.on('disconnect', () => {
             console.log('[Socket] 與服務器斷開連接');
             updateConnectionStatus('已斷開', false);
+            isConnected = false;
           });
           
-          // 設置事件監聽
+          // Setup event listeners
           setupEventListeners();
         } catch (error) {
           console.error('[Socket] 初始化 Socket.io 失敗:', error);
@@ -57,9 +92,14 @@ const SocketManager = (function() {
       });
     }
   
-    // 設置事件監聽
+    /**
+     * Setup event listeners
+     */
     function setupEventListeners() {
-      // 成功加入房間
+      // Make sure socket exists
+      if (!socket) return;
+      
+      // Room joined
       socket.on('room-joined', (data) => {
         console.log('[Socket] 已加入房間', data);
         if(!data || !data.users) {
@@ -68,13 +108,11 @@ const SocketManager = (function() {
         }
         updateRoomInfo(`房間: ${currentRoom.id} (${data.users.length} 人在線)`);
         
-        // 更新用戶列表
-        if (eventListeners.onRoomJoined) {
-          eventListeners.onRoomJoined(data);
-        }
+        // Trigger callback
+        triggerCallback('onRoomJoined', data);
       });
       
-      // 其他用戶加入
+      // User joined
       socket.on('user-joined', (data) => {
         console.log('[Socket] 用戶加入:', data);
         if(!data || !data.userId) {
@@ -82,12 +120,10 @@ const SocketManager = (function() {
           return;
         }
         
-        if (eventListeners.onUserJoined) {
-          eventListeners.onUserJoined(data);
-        }
+        triggerCallback('onUserJoined', data);
       });
       
-      // 用戶離開
+      // User left
       socket.on('user-left', (data) => {
         console.log('[Socket] 用戶離開:', data);
         if(!data || !data.userId) {
@@ -95,40 +131,47 @@ const SocketManager = (function() {
           return;
         }
         
-        if (eventListeners.onUserLeft) {
-          eventListeners.onUserLeft(data);
-        }
+        triggerCallback('onUserLeft', data);
       });
       
-      // 接收打鼓事件
+      // Drum hit
       socket.on('drum-hit', (data) => {
         console.log('[Socket] 收到打鼓:', data);
-        if(!data || !data.drumType || !data.timestamp) {
+        if(!data || !data.drumType) {
           console.error('[Socket] 打鼓數據無效:', data);
           return;
         }
         
-        if (eventListeners.onDrumHit) {
-          eventListeners.onDrumHit(data);
-        }
+        triggerCallback('onDrumHit', data);
       });
-
-      // 接收服務器時間
+      
+      // Error
+      socket.on('error', (error) => {
+        console.error('[Socket] 服務器錯誤:', error);
+        triggerCallback('onError', error);
+      });
+      
+      // Server time
       socket.on('server-time', (data) => {
-        if(!data || typeof data.serverTime !== 'number') {
+        if (!data || typeof data.serverTime !== 'number') {
           console.error('[Socket] 服務器時間數據無效:', data);
           return;
         }
         
-        if (timePromiseResolve) {
-          timePromiseResolve(data.serverTime);
-          timePromiseResolve = null;
-        }
+        triggerCallback('onServerTime', data);
       });
     }
   
-    // 加入房間
+    /**
+     * Join a room
+     * @param {string} roomId - Room ID
+     */
     function joinRoom(roomId) {
+      if (!socket || !isConnected) {
+        console.error('[Socket] 無法加入房間: 未連接到服務器');
+        return;
+      }
+      
       if(!roomId) {
         console.error('[Socket] 房間ID無效');
         return;
@@ -136,7 +179,7 @@ const SocketManager = (function() {
       
       currentRoom.id = roomId;
       
-      // 發送加入房間請求
+      // Send join room request
       socket.emit('join-room', {
         roomId: roomId,
         userId: currentUser.id
@@ -146,36 +189,46 @@ const SocketManager = (function() {
       updateRoomInfo(`房間: ${roomId} (加入中...)`);
     }
   
-    // 發送打鼓事件
+    /**
+     * Send drum hit event
+     * @param {string} drumType - Drum type
+     * @returns {boolean} Success status
+     */
     function sendDrumHit(drumType) {
-        if (!socket || !socket.connected) {
-          console.warn('[Socket] 無法發送打鼓事件: 未連接到服務器');
-          return false;
-        }
-        
-        if(!drumType) {
-          console.error('[Socket] 鼓類型無效');
-          return false;
-        }
-        
-        try {
-          // 使用延遲管理器校正時間戳
-          const timestamp = window.LatencyManager.adjustEventTime(Date.now());
-          
-          // 發送到服務器
-          socket.emit('drum-hit', {
-            drumType: drumType,
-            timestamp: timestamp
-          });
-          
-          return true;
-        } catch(error) {
-          console.error('[Socket] 發送打鼓事件失敗:', error);
-          return false;
-        }
+      if (!socket || !isConnected) {
+        console.warn('[Socket] 無法發送打鼓事件: 未連接到服務器');
+        return false;
       }
+      
+      if(!drumType) {
+        console.error('[Socket] 鼓類型無效');
+        return false;
+      }
+      
+      try {
+        // Use current time if LatencyManager is not available
+        const timestamp = window.LatencyManager && window.LatencyManager.isReady 
+          ? window.LatencyManager.adjustEventTime(Date.now()) 
+          : Date.now();
+        
+        // Send to server
+        socket.emit('drum-hit', {
+          drumType: drumType,
+          timestamp: timestamp
+        });
+        
+        return true;
+      } catch(error) {
+        console.error('[Socket] 發送打鼓事件失敗:', error);
+        return false;
+      }
+    }
   
-    // 更新連接狀態顯示
+    /**
+     * Update connection status display
+     * @param {string} status - Status message
+     * @param {boolean} isConnected - Connection status
+     */
     function updateConnectionStatus(status, isConnected) {
       const statusElement = document.getElementById('connectionStatus');
       if (statusElement) {
@@ -184,7 +237,10 @@ const SocketManager = (function() {
       }
     }
   
-    // 更新房間資訊顯示
+    /**
+     * Update room info display
+     * @param {string} info - Room info
+     */
     function updateRoomInfo(info) {
       const infoElement = document.getElementById('roomInfo');
       if (infoElement) {
@@ -192,7 +248,11 @@ const SocketManager = (function() {
       }
     }
   
-    // 註冊事件監聽器
+    /**
+     * Register event listener
+     * @param {string} eventName - Event name
+     * @param {Function} callback - Callback function
+     */
     function on(eventName, callback) {
       if(!eventName || typeof callback !== 'function') {
         console.error('[Socket] 無效的事件監聽器參數');
@@ -201,7 +261,25 @@ const SocketManager = (function() {
       eventListeners[eventName] = callback;
     }
   
-    // 設置當前用戶的鼓類型
+    /**
+     * Trigger registered callback
+     * @param {string} eventName - Event name
+     * @param {*} data - Event data
+     */
+    function triggerCallback(eventName, data) {
+      if (eventListeners[eventName]) {
+        try {
+          eventListeners[eventName](data);
+        } catch (error) {
+          console.error(`[Socket] 執行事件回調 ${eventName} 時出錯:`, error);
+        }
+      }
+    }
+  
+    /**
+     * Set current user's drum type
+     * @param {string} drumType - Drum type
+     */
     function setDrumType(drumType) {
       if(!drumType) {
         console.error('[Socket] 鼓類型無效');
@@ -209,39 +287,66 @@ const SocketManager = (function() {
       }
       currentUser.drumType = drumType;
     }
-
-    // 請求服務器時間
-    function requestServerTime() {
+  
+    /**
+     * Request server time
+     * @param {string} requestId - Optional request ID
+     * @returns {Promise} Resolution provides server time
+     */
+    function requestServerTime(requestId) {
       return new Promise((resolve, reject) => {
-        if (!socket || !socket.connected) {
+        if (!socket || !isConnected) {
           reject(new Error('[Socket] 未連接到服務器'));
           return;
         }
         
-        timePromiseResolve = resolve;
-        socket.emit('request-server-time');
-        
-        // 設置超時以避免永久等待
-        setTimeout(() => {
-          if (timePromiseResolve) {
-            timePromiseResolve = null;
-            reject(new Error('[Socket] 時間同步請求超時'));
-          }
+        // Setup one-time listener for this specific request
+        const timeoutId = setTimeout(() => {
+          socket.off('server-time', timeHandler);
+          reject(new Error('[Socket] 時間同步請求超時'));
         }, 3000);
+        
+        const timeHandler = (data) => {
+          // Check if this is our response (if requestId was provided)
+          if (requestId && data.requestId && data.requestId !== requestId) {
+            return; // Not our response
+          }
+          
+          // Clear timeout and remove listener
+          clearTimeout(timeoutId);
+          socket.off('server-time', timeHandler);
+          
+          resolve(data);
+        };
+        
+        // Add temporary listener
+        socket.on('server-time', timeHandler);
+        
+        // Send request
+        socket.emit('request-server-time', { requestId });
       });
     }
   
-    // 暴露公共方法
-    return {
-        init,
-        currentUser,
-        currentRoom,
-        sendDrumHit,
-        on,
-        setDrumType,
-        requestServerTime   
-    };
+    /**
+     * Check if connected to server
+     * @returns {boolean} Connection status
+     */
+    function isSocketConnected() {
+      return isConnected;
+    }
   
-  // 導出模組
+    // Public API
+    return {
+      init,
+      currentUser,
+      currentRoom,
+      sendDrumHit,
+      on,
+      setDrumType,
+      requestServerTime,
+      isConnected: isSocketConnected
+    };
+  })();
+  
+  // Export module
   window.SocketManager = SocketManager;
-})();

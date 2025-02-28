@@ -1,135 +1,308 @@
-// 延遲管理與時間同步模組
+// Enhanced Latency Management & Time Synchronization Module
 const LatencyManager = (function() {
-    // 服務器與客戶端時間差
+    // Server-client time offset (ms)
     let serverTimeOffset = 0;
-    // 網絡延遲估計 (毫秒)
+    // Network latency estimation (ms)
     let networkLatency = 0;
-    // 時間同步樣本數
+    // Time sync samples
     const TIME_SYNC_SAMPLES = 5;
-    // 保存同步樣本
+    // Store sync samples
     const latencySamples = [];
-    // 是否已完成初始同步
+    // Initial sync status
     let isInitialSyncComplete = false;
-    // 音頻播放提前量 (毫秒) - 根據測試調整
+    // Audio playback advance time (ms) - adjusted based on testing
     const AUDIO_ADVANCE_TIME = 20;
+    // Last sync time
+    let lastSyncTime = 0;
+    // Sync interval (every 5 minutes)
+    const SYNC_INTERVAL = 5 * 60 * 1000;
+    // Maximum number of sync retries
+    const MAX_SYNC_RETRIES = 3;
+    // Current retry count
+    let syncRetryCount = 0;
+    // Default jitter buffer (ms)
+    let jitterBuffer = 15;
   
-    // 初始化延遲管理
+    /**
+     * Initialize latency management
+     * @returns {Promise} Resolution indicates completion
+     */
     function init() {
       console.log('初始化延遲管理...');
+      lastSyncTime = Date.now();
       return startTimeSync();
     }
   
-    // 開始時間同步過程
+    /**
+     * Start time synchronization process
+     * @returns {Promise} Resolution indicates completion
+     */
     function startTimeSync() {
-      return new Promise((resolve) => {
-        // 進行多次同步以獲得更準確的結果
+      return new Promise((resolve, reject) => {
+        syncRetryCount = 0;
         const syncPromises = [];
         
+        // Multiple sync attempts for accuracy
         for (let i = 0; i < TIME_SYNC_SAMPLES; i++) {
           syncPromises.push(new Promise(resolveSync => {
             setTimeout(() => {
-              performTimeSync().then(resolveSync);
-            }, i * 300); // 間隔300毫秒進行多次同步
+              performTimeSync()
+                .then(resolveSync)
+                .catch(error => {
+                  console.warn('Time sync attempt failed:', error);
+                  resolveSync({ failed: true });
+                });
+            }, i * 300); // 300ms interval between attempts
           }));
         }
         
-        Promise.all(syncPromises).then(() => {
-          // 計算平均延遲和時間差
-          calculateFinalLatency();
-          isInitialSyncComplete = true;
-          console.log(`時間同步完成: 網絡延遲=${networkLatency}ms, 時間偏移=${serverTimeOffset}ms`);
-          resolve(true);
-        });
+        Promise.all(syncPromises)
+          .then(results => {
+            // Filter out failed attempts
+            const successfulAttempts = results.filter(r => !r || !r.failed);
+            
+            if (successfulAttempts.length < 3) {
+              // Not enough successful samples, retry if under max retries
+              if (syncRetryCount < MAX_SYNC_RETRIES) {
+                syncRetryCount++;
+                console.log(`重試時間同步 (${syncRetryCount}/${MAX_SYNC_RETRIES})...`);
+                return startTimeSync().then(resolve).catch(reject);
+              } else {
+                console.warn('無法完成時間同步，使用預設值');
+                // Use reasonable defaults if sync fails
+                networkLatency = 100;
+                serverTimeOffset = 0;
+                isInitialSyncComplete = true;
+                resolve(false);
+              }
+            } else {
+              // Calculate final latency values
+              calculateFinalLatency();
+              isInitialSyncComplete = true;
+              console.log(`時間同步完成: 網絡延遲=${networkLatency}ms, 時間偏移=${serverTimeOffset}ms`);
+              
+              // Adjust jitter buffer based on network conditions
+              adjustJitterBuffer();
+              
+              // Schedule periodic sync
+              schedulePeriodicSync();
+              
+              resolve(true);
+            }
+          })
+          .catch(error => {
+            console.error('Time sync failed:', error);
+            reject(error);
+          });
       });
     }
   
-    // 執行單次時間同步
+    /**
+     * Perform a single time synchronization
+     * @returns {Promise} Resolution indicates completion
+     */
     function performTimeSync() {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         const syncStartTime = Date.now();
+        const requestId = `sync-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         
-        // 請求服務器時間
-        window.SocketManager.requestServerTime()
-          .then(serverTime => {
+        // Create a timeout in case server doesn't respond
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Time sync request timed out'));
+        }, 3000);
+        
+        // Request server time with unique ID
+        window.SocketManager.requestServerTime(requestId)
+          .then(serverResponse => {
+            clearTimeout(timeoutId);
+            
             const syncEndTime = Date.now();
             const roundTripTime = syncEndTime - syncStartTime;
             const estimatedOneWayLatency = Math.floor(roundTripTime / 2);
             
-            // 計算本地時間與服務器時間的差異
-            // 客戶端時間 + 偏移 = 服務器時間
+            // Calculate local time at server response using estimated latency
             const clientTimeAtServerResponse = syncEndTime - estimatedOneWayLatency;
-            const timeOffset = serverTime - clientTimeAtServerResponse;
+            const timeOffset = serverResponse.serverTime - clientTimeAtServerResponse;
             
-            // 保存這次同步樣本
+            // Store this sync sample
             latencySamples.push({
               latency: estimatedOneWayLatency,
-              offset: timeOffset
+              offset: timeOffset,
+              roundTrip: roundTripTime
             });
             
             resolve();
           })
           .catch(err => {
+            clearTimeout(timeoutId);
             console.error('時間同步失敗:', err);
-            resolve();
+            reject(err);
           });
       });
     }
   
-    // 計算最終的延遲和時間偏移
+    /**
+     * Calculate final latency and offset values
+     */
     function calculateFinalLatency() {
       if (latencySamples.length === 0) {
         return;
       }
       
-      // 排序並取中間值以避免異常值的影響
+      // Sort by latency to find median
       const sortedLatencies = [...latencySamples].sort((a, b) => a.latency - b.latency);
       const medianIndex = Math.floor(sortedLatencies.length / 2);
       
+      // Use median values to avoid outliers
       networkLatency = sortedLatencies[medianIndex].latency;
       serverTimeOffset = sortedLatencies[medianIndex].offset;
+      
+      // Calculate jitter (variation in latency)
+      const latencyValues = latencySamples.map(s => s.latency);
+      const avgLatency = latencyValues.reduce((sum, val) => sum + val, 0) / latencyValues.length;
+      const jitter = Math.sqrt(
+        latencyValues.map(l => Math.pow(l - avgLatency, 2))
+          .reduce((sum, val) => sum + val, 0) / latencyValues.length
+      );
+      
+      console.log(`網絡抖動: ${jitter.toFixed(2)}ms`);
     }
   
-    // 獲取校正後的服務器時間
+    /**
+     * Adjust jitter buffer based on network conditions
+     */
+    function adjustJitterBuffer() {
+      // Calculate jitter
+      const latencyValues = latencySamples.map(s => s.latency);
+      const avgLatency = latencyValues.reduce((sum, val) => sum + val, 0) / latencyValues.length;
+      
+      // Standard deviation calculation
+      const jitter = Math.sqrt(
+        latencyValues.map(l => Math.pow(l - avgLatency, 2))
+          .reduce((sum, val) => sum + val, 0) / latencyValues.length
+      );
+      
+      // Adjust jitter buffer (minimum 15ms, maximum 100ms)
+      jitterBuffer = Math.min(100, Math.max(15, jitter * 2));
+      console.log(`調整抖動緩衝區: ${jitterBuffer.toFixed(2)}ms`);
+    }
+  
+    /**
+     * Schedule periodic time synchronization
+     */
+    function schedulePeriodicSync() {
+      setInterval(() => {
+        // Only sync if enough time has passed since last sync
+        const now = Date.now();
+        if (now - lastSyncTime >= SYNC_INTERVAL) {
+          console.log('執行定期時間同步...');
+          lastSyncTime = now;
+          
+          // Clear old samples and resync
+          latencySamples.length = 0;
+          startTimeSync().catch(error => {
+            console.error('定期時間同步失敗:', error);
+          });
+        }
+      }, 60000); // Check every minute
+    }
+  
+    /**
+     * Get corrected server time
+     * @returns {number} Corrected server time
+     */
     function getServerTime() {
       return Date.now() + serverTimeOffset;
     }
   
-    // 校正事件時間
+    /**
+     * Adjust event time
+     * @param {number} localTimestamp - Local timestamp
+     * @returns {number} Adjusted timestamp
+     */
     function adjustEventTime(localTimestamp) {
       return localTimestamp + serverTimeOffset;
     }
   
-    // 決定音頻播放時間 (考慮網絡延遲和提前量)
+    /**
+     * Calculate audio playback time
+     * @param {number} eventTimestamp - Event timestamp
+     * @returns {number} Playback delay in ms
+     */
     function calculateAudioPlayTime(eventTimestamp) {
       const currentServerTime = getServerTime();
-      const playDelay = Math.max(0, eventTimestamp - currentServerTime);
+      let playDelay = Math.max(0, eventTimestamp - currentServerTime);
       
-      // 提前一點播放以補償音頻系統的內部延遲
+      // Apply jitter buffer if network conditions are unstable
+      if (networkLatency > 80 || jitterBuffer > 30) {
+        playDelay += jitterBuffer;
+      }
+      
+      // Compensate for audio system latency
       return Math.max(0, playDelay - AUDIO_ADVANCE_TIME);
     }
   
-    // 檢查是否需要立即播放或延遲播放
+    /**
+     * Check if playback should happen immediately
+     * @param {number} eventTimestamp - Event timestamp
+     * @returns {boolean} True if should play immediately
+     */
     function shouldPlayImmediately(eventTimestamp) {
       const playTime = calculateAudioPlayTime(eventTimestamp);
       return playTime <= 0;
     }
   
-    // 安排延遲播放
+    /**
+     * Schedule delayed playback
+     * @param {number} eventTimestamp - Event timestamp
+     * @param {Function} callback - Callback function
+     * @returns {number} Delay time in ms
+     */
     function scheduleDelayedPlay(eventTimestamp, callback) {
       const delayTime = calculateAudioPlayTime(eventTimestamp);
       
       if (delayTime <= 0) {
-        // 立即播放
+        // Play immediately
         callback();
         return 0;
       } else {
-        // 延遲播放
+        // Schedule delayed play
         setTimeout(callback, delayTime);
         return delayTime;
       }
     }
   
-    // 暴露公共方法
+    /**
+     * Get network statistics
+     * @returns {Object} Network stats
+     */
+    function getNetworkStats() {
+      if (!isInitialSyncComplete) {
+        return { status: 'initializing' };
+      }
+      
+      let quality = 'unknown';
+      
+      if (networkLatency < 50) {
+        quality = 'excellent';
+      } else if (networkLatency < 100) {
+        quality = 'good';
+      } else if (networkLatency < 200) {
+        quality = 'fair';
+      } else {
+        quality = 'poor';
+      }
+      
+      return {
+        status: 'ready',
+        latency: networkLatency,
+        jitterBuffer,
+        quality,
+        offset: serverTimeOffset
+      };
+    }
+  
+    // Public API
     return {
       init,
       getServerTime,
@@ -137,10 +310,12 @@ const LatencyManager = (function() {
       calculateAudioPlayTime,
       shouldPlayImmediately,
       scheduleDelayedPlay,
+      getNetworkStats,
       get networkLatency() { return networkLatency; },
+      get jitterBuffer() { return jitterBuffer; },
       get isReady() { return isInitialSyncComplete; }
     };
   })();
   
-  // 導出模組
+  // Export module
   window.LatencyManager = LatencyManager;
