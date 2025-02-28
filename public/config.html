@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>玩家設定 - Never Ending Drum Party</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* 設定頁面的專屬樣式 */
+    body {
+      background-color: #121212;
+      color: #f0f0f0;
+      font-family: 'Arial', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .config-container {
+      background-color: #1e1e1e;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .config-container h2 {
+      margin-bottom: 20px;
+      color: #f8f8f8;
+    }
+    .config-container label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      text-align: left;
+    }
+    .config-container input[type="text"],
+    .config-container select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: none;
+      border-radius: 5px;
+      background-color: #333;
+      color: #fff;
+      font-size: 16px;
+    }
+    .config-container button {
+      background-color: #2d4263;
+      color: #fff;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .config-container button:hover {
+      background-color: #3a5178;
+    }
+  </style>
+</head>
+<body>
+  <div class="config-container">
+    <h2>玩家設定</h2>
+    <label for="playerName">玩家名稱</label>
+    <input type="text" id="playerName" placeholder="請輸入玩家名稱" />
+    <label for="instrumentSelect">選擇打擊樂器</label>
+    <select id="instrumentSelect">
+      <option value="kick">底鼓</option>
+      <option value="snare">小鼓</option>
+      <option value="hihat">踩鑔</option>
+      <option value="tom">嗵鼓</option>
+      <option value="crash">鈸</option>
+    </select>
+    <button id="startGameBtn">開始遊戲</button>
+  </div>
+
+  <script>
+    document.getElementById('startGameBtn').addEventListener('click', function(){
+      const playerName = document.getElementById('playerName').value.trim();
+      const instrument = document.getElementById('instrumentSelect').value;
+      if (!playerName) {
+         alert("請輸入玩家名稱");
+         return;
+      }
+      // 將玩家設定存入 localStorage
+      localStorage.setItem('playerName', playerName);
+      localStorage.setItem('instrument', instrument);
+      // 導向遊戲頁面（例如 game.html）
+      window.location.href = '/game.html';
+    });
+  </script>
+</body>
+</html>

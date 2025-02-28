@@ -14,7 +14,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // 路由設定
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+  res.sendFile(path.join(__dirname, '../public/config.html'));
 });
 
 // 設定 Socket.io 事件處理
