@@ -29,10 +29,12 @@ function isRoomFull(roomId) {
  * @param {string} roomId - 房間識別碼
  * @param {string} userId - 用戶識別碼
  * @param {string} socketId - Socket 連線 ID
+ * @param {string} name - 玩家名稱
+ * @param {string} drumType - 樂器類型
  * @returns {Object} 包含該用戶的 position 及房間中所有用戶資訊
  */
-function joinRoom(roomId, userId, socketId) {
-  // 若房間不存在則建立
+function joinRoom(roomId, userId, socketId, name, drumType) {
+  // 如果房間不存在則建立
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
       id: roomId,
@@ -45,10 +47,10 @@ function joinRoom(roomId, userId, socketId) {
 
   const room = rooms.get(roomId);
   
-  // 更新活動時間
+  // 更新房間活動時間
   room.lastActivity = Date.now();
   
-  // 若用戶已存在於房間中，更新其 socket ID
+  // 如果用戶已存在於房間中，更新其 socketId
   if (room.users.has(userId)) {
     const userInfo = room.users.get(userId);
     userInfo.socketId = socketId;
@@ -60,22 +62,23 @@ function joinRoom(roomId, userId, socketId) {
   
   let position;
   if (room.users.size === 0) {
-    // 第一位用戶：不分配 grid position，由客戶端自行置於中下方（self view）
+    // 第一位用戶：不分配 grid position，由客戶端自行置於中下方
     position = null;
   } else {
     // 為新進用戶分配一個可用位置
     position = assignGridPosition(room);
   }
   
-  // 儲存用戶資訊
+  // 儲存用戶資訊，包含 name 與 drumType
   room.users.set(userId, {
     id: userId,
     socketId,
     position,
-    joinedAt: Date.now()
+    joinedAt: Date.now(),
+    name,        // 新增玩家名稱
+    drumType     // 新增樂器類型
   });
   
-  // 若有分配 grid position 則記錄
   if (position !== null) {
     room.gridPositions.set(position, userId);
   }

@@ -27,7 +27,19 @@
     </div>
     
     <!-- 控制區域 -->
-    <div class="controls">
+<div class="controls">
+  <!-- 更換樂器選項 -->
+  <div class="instrument-change">
+    <label for="changeInstrumentSelect" style="font-weight: bold; display: block; margin-bottom: 5px;">更換樂器:</label>
+    <select id="changeInstrumentSelect" style="padding: 8px; border-radius: 4px; border: none; background-color: #333; color: #fff;">
+      <option value="kick">底鼓</option>
+      <option value="snare">小鼓</option>
+      <option value="hihat">踩鑔</option>
+      <option value="tom">嗵鼓</option>
+      <option value="crash">鈸</option>
+    </select>
+  </div>
+  
       <!-- 按鍵說明 -->
       <div class="instructions">
         <h3>按鍵說明:</h3>
@@ -42,8 +54,7 @@
         <p id="connectionStatus">連接中...</p>
         <p id="roomInfo">房間: 默認房間</p>
       </div>
-    </div>
-  </div>
+    </div> 
 
   <!-- 音頻啟動 Modal (保持原狀) -->
   <div id="audioStartModal" class="modal">

@@ -30,21 +30,21 @@ const UIManager = (function() {
      * 更新所有用戶格子
      */
     function updateUserCells(users) {
-      // 清空現有映射
-      userCellMap.clear();
-      
-      // 重置格子內容
-      resetGridCells();
-      
-      // 添加用戶到格子
-      if (users && Array.isArray(users)) {
-        users.forEach(user => {
-          if (user.id !== window.SocketManager?.currentUser?.id) {
-            addUserToCell(user.id, user.position);
-          }
-        });
+        // 清空現有映射
+        userCellMap.clear();
+        
+        // 重置格子內容
+        resetGridCells();
+        
+        // 添加用戶到格子，直接使用 user 物件
+        if (users && Array.isArray(users)) {
+          users.forEach(user => {
+            if (user.id !== window.SocketManager?.currentUser?.id) {
+              addUserToCell(user);
+            }
+          });
+        }
       }
-    }
   
     /**
      * 重置所有格子
@@ -63,23 +63,23 @@ const UIManager = (function() {
     /**
      * 添加用戶到格子
      */
-    function addUserToCell(userId, position) {
-      const cellId = `cell-${position}`;
-      const cell = document.getElementById(cellId);
-      
-      if (cell) {
-        // 提取用戶ID的數字部分
-        const userNumber = userId.split('-')[1] || userId;
+    function addUserToCell(user) {
+        const cellId = `cell-${user.position}`;
+        const cell = document.getElementById(cellId);
         
-        // 設置格子內容
-        cell.innerHTML = `<div class="user-info">用戶 ${userNumber}</div>`;
-        cell.setAttribute('data-user', userId);
-        cell.classList.add('occupied');
-        
-        // 記錄映射
-        userCellMap.set(userId, cellId);
+        if (cell) {
+          // 使用玩家的 name，若無則回退到從 ID 中提取數字
+          const displayName = user.name ? user.name : `用戶 ${user.id.split('-')[1] || user.id}`;
+          
+          // 設置格子內容
+          cell.innerHTML = `<div class="user-info">${displayName}</div>`;
+          cell.setAttribute('data-user', user.id);
+          cell.classList.add('occupied');
+          
+          // 記錄映射
+          userCellMap.set(user.id, cellId);
+        }
       }
-    }
   
     /**
      * 從格子移除用戶

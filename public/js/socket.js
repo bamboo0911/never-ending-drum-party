@@ -181,8 +181,10 @@ const SocketManager = (function() {
       
       // Send join room request
       socket.emit('join-room', {
-        roomId: roomId,
-        userId: currentUser.id
+        roomId: currentRoom.id,
+        userId: currentUser.id,
+        name: currentUser.name,       
+        drumType: currentUser.drumType 
       });
       
       console.log(`[Socket] 正在加入房間: ${roomId}`);
@@ -334,6 +336,22 @@ const SocketManager = (function() {
     function isSocketConnected() {
       return isConnected;
     }
+
+    /**
+     * Change instrument
+     * @param {string} newInstrument - New instrument type
+     */
+    function changeInstrument(newInstrument) {
+      if (!socket || !isConnected) {
+        console.warn('[Socket] 無法發送更換樂器事件: 未連接到服務器');
+        return;
+      }
+      // 發送更換樂器事件，包含使用者 ID 與新樂器資訊
+      socket.emit('change-instrument', {
+        userId: currentUser.id,
+        drumType: newInstrument
+      });
+    }
   
     // Public API
     return {
@@ -344,7 +362,8 @@ const SocketManager = (function() {
       on,
       setDrumType,
       requestServerTime,
-      isConnected: isSocketConnected
+      isConnected: isSocketConnected,
+      changeInstrument
     };
   })();
   

@@ -11,15 +11,15 @@ module.exports = function(io) {
     // 處理加入房間事件
     socket.on('join-room', (data) => {
       try {
-        // 驗證必要資料
-        if (!data || !data.roomId || !data.userId) {
+        // 現在除了 roomId 與 userId，也必須包含 name 與 drumType
+        if (!data || !data.roomId || !data.userId || !data.name || !data.drumType) {
           return socket.emit('error', { message: '無效的房間加入請求' });
         }
         
-        const { roomId, userId } = data;
-        console.log(`用戶 ${userId} 加入房間 ${roomId}`);
+        const { roomId, userId, name, drumType } = data;
+        console.log(`用戶 ${userId} (${name}) 加入房間 ${roomId}，使用樂器: ${drumType}`);
         
-        // 檢查房間人數是否達上限（8 人，內含自己）
+        // 檢查房間容量
         if (roomManager.isRoomFull(roomId)) {
           return socket.emit('error', { 
             message: '房間已滿', 
@@ -27,7 +27,8 @@ module.exports = function(io) {
           });
         }
         
-        const roomInfo = roomManager.joinRoom(roomId, userId, socket.id);
+        // 傳入 name 與 drumType 至 joinRoom
+        const roomInfo = roomManager.joinRoom(roomId, userId, socket.id, name, drumType);
         
         // 若無法分配位置（理論上僅發生於非第一位用戶），則回傳錯誤
         if (roomInfo.position === undefined) {
@@ -40,13 +41,15 @@ module.exports = function(io) {
         socket.join(roomId);
         socket.userId = userId;
         socket.roomId = roomId;
-
-        // 傳送成功加入房間通知，房間資訊中包含所有用戶（客戶端需自行將自己的位置調整為中下方）
+        
+        // 傳送成功加入房間通知，包含房間中所有用戶資訊（其中每個用戶物件內就有 name 與 drumType）
         socket.emit('room-joined', roomInfo);
-
-        // 通知房間中其他用戶有新用戶加入
+        
+        // 通知房間中其他用戶
         socket.to(roomId).emit('user-joined', {
           userId,
+          name,
+          drumType,
           position: roomInfo.position
         });
       } catch (error) {

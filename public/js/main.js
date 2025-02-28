@@ -11,6 +11,27 @@
     
     // 等待DOM加載完成
     document.addEventListener('DOMContentLoaded', initApp);
+
+    // 新增：監聽「更換樂器」選單變更事件
+    function setupInstrumentChange() {
+      const changeSelect = document.getElementById('changeInstrumentSelect');
+      if (!changeSelect) return;
+      
+      changeSelect.addEventListener('change', (e) => {
+        const newInstrument = e.target.value;
+        console.log("更換樂器為:", newInstrument);
+        
+        // 更新當前用戶設定
+        if (window.SocketManager && window.SocketManager.currentUser) {
+          window.SocketManager.currentUser.drumType = newInstrument;
+        }
+        
+        // (選擇性) 通知伺服器：發送「更換樂器」事件
+        if (window.SocketManager && typeof window.SocketManager.changeInstrument === 'function') {
+          window.SocketManager.changeInstrument(newInstrument);
+        }
+      });
+    }
     
     /**
      * 初始化應用
@@ -51,6 +72,9 @@
         // 設置優化的事件處理程序
         setupOptimizedEventHandlers();
         initOptimizedEvents();
+        
+        // 新增：設定更換樂器選單事件監聽
+        setupInstrumentChange();
         
         appState.initialized = true;
         console.log('應用初始化完成');
@@ -195,10 +219,11 @@
           }
         },
         onUserJoined: (data) => {
-          if (window.UIManager && data && data.userId && data.position) {
-            window.UIManager.addUserToCell(data.userId, data.position);
-          }
-        },
+            // 傳入完整的用戶物件（包含 name 與 drumType）
+            if (window.UIManager && data) {
+              window.UIManager.addUserToCell(data);
+            }
+          },
         onUserLeft: (data) => {
           if (window.UIManager && data && data.userId) {
             window.UIManager.removeUserFromCell(data.userId);
