@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Never Ending Drum Party</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Never Ending Drum Party</h1>
+    
+    <div class="drum-grid" id="drumGrid">
+      <div class="grid-cell" id="cell-top-left"></div>
+      <div class="grid-cell" id="cell-top-center"></div>
+      <div class="grid-cell" id="cell-top-right"></div>
+      
+      <div class="grid-cell" id="cell-middle-left"></div>
+      <div class="grid-cell" id="cell-center">AI 指揮<br>(即將推出)</div>
+      <div class="grid-cell" id="cell-middle-right"></div>
+      
+      <div class="grid-cell" id="cell-bottom-left"></div>
+      <div class="grid-cell" id="cell-bottom-center">你</div>
+      <div class="grid-cell" id="cell-bottom-right"></div>
+    </div>
+    
+    <div class="controls">
+      <div class="drum-selection">
+        <h3>選擇你的鼓:</h3>
+        <select id="drumSelect">
+          <option value="kick">底鼓 (Q)</option>
+          <option value="snare">小鼓 (W)</option>
+          <option value="hihat">踩鑔 (E)</option>
+          <option value="tom">嗵鼓 (R)</option>
+          <option value="crash">鈸 (T)</option>
+        </select>
+      </div>
+      
+      <div class="instructions">
+        <h3>按鍵說明:</h3>
+        <ul>
+          <li><strong>Q</strong>: 底鼓</li>
+          <li><strong>W</strong>: 小鼓</li>
+          <li><strong>E</strong>: 踩鑔</li>
+          <li><strong>R</strong>: 嗵鼓</li>
+          <li><strong>T</strong>: 鈸</li>
+        </ul>
+      </div>
+      
+      <div class="status">
+        <p id="connectionStatus">連接中...</p>
+        <p id="roomInfo">房間: 默認房間</p>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 腳本加載 -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/audio.js"></script>
+  <script src="/js/socket.js"></script>
+  <script src="/js/ui.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>
