@@ -160,18 +160,17 @@
      * @returns {string|null} 格子ID或null
      */
     function getCellIdForUser(userId) {
-      // 如果是當前用戶
-      if (window.SocketManager && userId === window.SocketManager.currentUser?.id) {
+        // 如果是當前用戶，固定回傳 cell-bottom-center
+        if (window.SocketManager && userId === window.SocketManager.currentUser?.id) {
         return 'cell-bottom-center';
-      }
-      
-      // 如果是其他用戶，從映射中查找
-      const userMap = window.UIManager?.userCellMap;
-      if (userMap && userMap instanceof Map) {
-        return userMap.get(userId);
-      }
-      
-      return null;
+        }
+        
+        // 其他用戶透過 UIManager 的 getter 取得對應格子ID
+        if (window.UIManager && typeof window.UIManager.getCellId === 'function') {
+        return window.UIManager.getCellId(userId);
+        }
+        
+        return null;
     }
     
     /**

@@ -5,13 +5,13 @@ module.exports = function(io) {
   io.on('connection', (socket) => {
     console.log('新用戶連接:', socket.id);
     
-    // Setup time synchronization handler
+    // 設定時間同步處理
     timeSync.handleTimeSync(socket);
 
-    // Add user to room with validation
+    // 處理加入房間事件
     socket.on('join-room', (data) => {
       try {
-        // Validate required data
+        // 驗證必要資料
         if (!data || !data.roomId || !data.userId) {
           return socket.emit('error', { message: '無效的房間加入請求' });
         }
@@ -19,7 +19,7 @@ module.exports = function(io) {
         const { roomId, userId } = data;
         console.log(`用戶 ${userId} 加入房間 ${roomId}`);
         
-        // Check room capacity before joining
+        // 檢查房間人數是否達上限（8 人，內含自己）
         if (roomManager.isRoomFull(roomId)) {
           return socket.emit('error', { 
             message: '房間已滿', 
@@ -29,8 +29,8 @@ module.exports = function(io) {
         
         const roomInfo = roomManager.joinRoom(roomId, userId, socket.id);
         
-        // Check if position was assigned correctly
-        if (!roomInfo.position) {
+        // 若無法分配位置（理論上僅發生於非第一位用戶），則回傳錯誤
+        if (roomInfo.position === undefined) {
           return socket.emit('error', { 
             message: '無法分配位置，請稍後再試', 
             code: 'NO_POSITION_AVAILABLE' 
@@ -41,10 +41,10 @@ module.exports = function(io) {
         socket.userId = userId;
         socket.roomId = roomId;
 
-        // Notify user they've successfully joined
+        // 傳送成功加入房間通知，房間資訊中包含所有用戶（客戶端需自行將自己的位置調整為中下方）
         socket.emit('room-joined', roomInfo);
 
-        // Notify others in the room
+        // 通知房間中其他用戶有新用戶加入
         socket.to(roomId).emit('user-joined', {
           userId,
           position: roomInfo.position
@@ -58,17 +58,17 @@ module.exports = function(io) {
       }
     });
 
-    // Handle time synchronization
+    // 處理時間同步請求
     socket.on('request-server-time', () => {
       socket.emit('server-time', {
         serverTime: Date.now()
       });
     });
 
-    // Handle drum hit events with validation
+    // 處理打鼓事件
     socket.on('drum-hit', (data) => {
       try {
-        // Validate user is in a room
+        // 檢查用戶是否已加入房間
         if (!socket.roomId) {
           return socket.emit('error', { 
             message: '未加入房間',
@@ -76,7 +76,7 @@ module.exports = function(io) {
           });
         }
         
-        // Validate required data
+        // 驗證必要資料
         if (!data || !data.drumType) {
           return socket.emit('error', { 
             message: '無效的打鼓事件',
@@ -86,13 +86,13 @@ module.exports = function(io) {
         
         console.log(`用戶 ${socket.userId} 敲擊了: ${data.drumType}，時間戳: ${data.timestamp}`);
         
-        // Rate limiting to prevent spam (max 20 hits per second)
+        // Rate limiting：防止過於頻繁，限制每秒最多 20 次
         if (socket.lastHitTime && Date.now() - socket.lastHitTime < 50) {
-          return; // Silently drop events that are too frequent
+          return; // 若過於頻繁，則忽略此次事件
         }
         socket.lastHitTime = Date.now();
         
-        // Broadcast to others in the room
+        // 廣播打鼓事件給房間中其它用戶
         socket.to(socket.roomId).emit('drum-hit', {
           userId: socket.userId,
           drumType: data.drumType,
@@ -100,11 +100,11 @@ module.exports = function(io) {
         });
       } catch (error) {
         console.error('打鼓事件錯誤:', error);
-        // No need to emit error to client for this event
+        // 此事件發生錯誤時不需通知客戶端
       }
     });
 
-    // Handle disconnection with cleanup
+    // 處理用戶斷線與清除
     socket.on('disconnect', () => {
       try {
         console.log('用戶斷開連接:', socket.id);
@@ -112,7 +112,7 @@ module.exports = function(io) {
         if (socket.userId && socket.roomId) {
           roomManager.leaveRoom(socket.roomId, socket.userId);
           
-          // Notify others in the room
+          // 通知房間中其它用戶有用戶離開
           socket.to(socket.roomId).emit('user-left', {
             userId: socket.userId
           });

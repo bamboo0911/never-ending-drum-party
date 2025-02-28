@@ -176,6 +176,15 @@ const UIManager = (function() {
       return true;
     }
   
+    /**
+     * 取得用戶對應的格子 ID
+     * @param {string} userId - 用戶 ID
+     * @returns {string|null} 對應的格子 ID 或 null
+     */
+    function getCellId(userId) {
+      return userCellMap.get(userId) || null;
+    }
+  
     // 暴露公共方法
     return {
       init,
@@ -183,7 +192,8 @@ const UIManager = (function() {
       addUserToCell,
       removeUserFromCell,
       highlightUserCell,
-      handleSoundPlayed
+      handleSoundPlayed,
+      getCellId // 新增的方法
     };
   })();
   

@@ -1,21 +1,21 @@
 // Improved Room Management
 const rooms = new Map();
 
-// Available positions (excluding center and bottom-center)
+// 可用位置（僅供非本地玩家使用，因為每位用戶的畫面中央固定空白，且中間下方為自身）
 const availablePositions = [
   'top-left', 'top-center', 'top-right',
   'middle-left', 'middle-right',
   'bottom-left', 'bottom-right'
 ];
 
-// Constants
-const MAX_USERS_PER_ROOM = 7; // Maximum users per room (matches available positions)
-const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutes
+// 更新上限：總玩家數上限 8 人（代表其他玩家上限 7 人）
+const MAX_USERS_PER_ROOM = 8;
+const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 分鐘
 
 /**
- * Check if a room is at maximum capacity
- * @param {string} roomId - Room identifier
- * @returns {boolean} True if room is full
+ * 檢查房間是否已滿
+ * @param {string} roomId - 房間識別碼
+ * @returns {boolean} 若房間已滿則回傳 true
  */
 function isRoomFull(roomId) {
   if (!rooms.has(roomId)) return false;
@@ -25,14 +25,14 @@ function isRoomFull(roomId) {
 }
 
 /**
- * Join a room
- * @param {string} roomId - Room identifier
- * @param {string} userId - User identifier
- * @param {string} socketId - Socket connection ID
- * @returns {Object} Room info including position and users
+ * 加入房間
+ * @param {string} roomId - 房間識別碼
+ * @param {string} userId - 用戶識別碼
+ * @param {string} socketId - Socket 連線 ID
+ * @returns {Object} 包含該用戶的 position 及房間中所有用戶資訊
  */
 function joinRoom(roomId, userId, socketId) {
-  // Create room if it doesn't exist
+  // 若房間不存在則建立
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
       id: roomId,
@@ -45,10 +45,10 @@ function joinRoom(roomId, userId, socketId) {
 
   const room = rooms.get(roomId);
   
-  // Update room activity time
+  // 更新活動時間
   room.lastActivity = Date.now();
   
-  // If user is already in room, update their socket ID
+  // 若用戶已存在於房間中，更新其 socket ID
   if (room.users.has(userId)) {
     const userInfo = room.users.get(userId);
     userInfo.socketId = socketId;
@@ -58,18 +58,25 @@ function joinRoom(roomId, userId, socketId) {
     };
   }
   
-  // Assign position
-  const position = assignGridPosition(room);
+  let position;
+  if (room.users.size === 0) {
+    // 第一位用戶：不分配 grid position，由客戶端自行置於中下方（self view）
+    position = null;
+  } else {
+    // 為新進用戶分配一個可用位置
+    position = assignGridPosition(room);
+  }
   
-  // Store user info
-  if (position) {
-    room.users.set(userId, {
-      id: userId,
-      socketId,
-      position,
-      joinedAt: Date.now()
-    });
-    
+  // 儲存用戶資訊
+  room.users.set(userId, {
+    id: userId,
+    socketId,
+    position,
+    joinedAt: Date.now()
+  });
+  
+  // 若有分配 grid position 則記錄
+  if (position !== null) {
     room.gridPositions.set(position, userId);
   }
   
@@ -80,27 +87,27 @@ function joinRoom(roomId, userId, socketId) {
 }
 
 /**
- * Leave a room
- * @param {string} roomId - Room identifier
- * @param {string} userId - User identifier
- * @returns {boolean} Success status
+ * 離開房間
+ * @param {string} roomId - 房間識別碼
+ * @param {string} userId - 用戶識別碼
+ * @returns {boolean} 回傳操作是否成功
  */
 function leaveRoom(roomId, userId) {
   if (!rooms.has(roomId)) return false;
   
   const room = rooms.get(roomId);
   
-  // Find and free up the user's position
+  // 釋放該用戶所佔位置
   const user = room.users.get(userId);
   if (user && user.position) {
     room.gridPositions.delete(user.position);
   }
   
-  // Remove user
+  // 移除用戶
   room.users.delete(userId);
   room.lastActivity = Date.now();
   
-  // Delete room if empty
+  // 若房間內無用戶則清除房間
   if (room.users.size === 0) {
     rooms.delete(roomId);
   }
@@ -109,34 +116,32 @@ function leaveRoom(roomId, userId) {
 }
 
 /**
- * Assign a grid position
- * @param {Object} room - Room object
- * @returns {string|null} Assigned position or null if none available
+ * 為用戶分配 grid 位置
+ * @param {Object} room - 房間物件
+ * @returns {string|null} 分配到的位置，若無則回傳 null
  */
 function assignGridPosition(room) {
-  // Find unused positions
+  // 取得已使用的位置
   const usedPositions = new Set();
-  
-  // Get all used positions
   for (const [position, userId] of room.gridPositions.entries()) {
     usedPositions.add(position);
   }
   
-  // Filter to get available positions
+  // 篩選可用位置
   const remainingPositions = availablePositions.filter(pos => !usedPositions.has(pos));
   
-  // Assign first available position if any
+  // 回傳第一個可用位置
   if (remainingPositions.length > 0) {
     return remainingPositions[0];
   }
   
-  return null; // No available positions
+  return null; // 若無可用位置
 }
 
 /**
- * Get all users in a room
- * @param {string} roomId - Room identifier
- * @returns {Array} Array of user objects
+ * 取得房間內所有用戶
+ * @param {string} roomId - 房間識別碼
+ * @returns {Array} 用戶物件陣列
  */
 function getRoomUsers(roomId) {
   if (!rooms.has(roomId)) return [];
@@ -146,9 +151,9 @@ function getRoomUsers(roomId) {
 }
 
 /**
- * Get information about a room
- * @param {string} roomId - Room identifier
- * @returns {Object|null} Room information or null if not found
+ * 取得房間資訊
+ * @param {string} roomId - 房間識別碼
+ * @returns {Object|null} 房間資訊或若未找到則回傳 null
  */
 function getRoomInfo(roomId) {
   if (!rooms.has(roomId)) return null;
@@ -164,7 +169,7 @@ function getRoomInfo(roomId) {
 }
 
 /**
- * Clean up inactive rooms (no activity for over 1 hour)
+ * 清理超過 1 小時無活動的房間
  */
 function cleanupInactiveRooms() {
   const now = Date.now();
@@ -178,10 +183,10 @@ function cleanupInactiveRooms() {
   }
 }
 
-// Run cleanup every 30 minutes
+// 每 30 分鐘清理一次
 setInterval(cleanupInactiveRooms, ROOM_CLEANUP_INTERVAL);
 
-// Get room statistics
+// 取得房間統計資訊
 function getRoomStats() {
   return {
     totalRooms: rooms.size,
