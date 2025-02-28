@@ -68,10 +68,10 @@ const AudioManager = (function() {
     }
   
     // 播放音效
-    function playSound(name) {
+    function playSound(name, timestamp = null) {
       if (!audioContext) {
         console.error('音頻上下文尚未初始化');
-        return;
+        return false;
       }
       
       // 如果音頻上下文被暫停（瀏覽器策略），則恢復
@@ -79,16 +79,66 @@ const AudioManager = (function() {
         audioContext.resume();
       }
       
-      if (audioBuffers[name]) {
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffers[name];
-        source.connect(audioContext.destination);
-        source.start(0);
-        return true;
-      } else {
+      if (!audioBuffers[name]) {
         console.warn(`未找到音頻: ${name}`);
         return false;
       }
+      
+      // 如果有時間戳並且延遲管理器已就緒，使用延遲補償
+      if (timestamp && window.LatencyManager && window.LatencyManager.isReady) {
+        if (window.LatencyManager.shouldPlayImmediately(timestamp)) {
+          // 立即播放
+          playWithVisualFeedback(name);
+        } else {
+          // 延遲播放
+          const delay = window.LatencyManager.scheduleDelayedPlay(timestamp, () => {
+            playWithVisualFeedback(name);
+          });
+          console.log(`音頻 ${name} 將在 ${delay}ms 後播放`);
+        }
+      } else {
+        // 沒有時間戳或延遲管理器未就緒，直接播放
+        playWithVisualFeedback(name);
+      }
+      
+      return true;
+    }
+
+    // 添加新的播放函數帶視覺反饋
+    function playWithVisualFeedback(name) {
+      // 創建音頻源
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffers[name];
+      
+      // 創建增益節點以控制音量
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 1.0; // 默認音量
+      
+      // 創建分析器節點以獲取音頻數據
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      // 連接節點: 源 -> 增益 -> 分析器 -> 目標
+      source.connect(gainNode);
+      gainNode.connect(analyser);
+      analyser.connect(audioContext.destination);
+      
+      // 開始播放
+      source.start(0);
+      
+      // 發送事件以便更新視覺效果
+      const customEvent = new CustomEvent('sound-played', {
+        detail: {
+          soundName: name,
+          analyser: analyser,
+          dataArray: dataArray
+        }
+      });
+      document.dispatchEvent(customEvent);
+      
+      return source;
     }
   
     // 創建臨時音頻（當實際音頻無法載入時使用）
@@ -157,7 +207,8 @@ const AudioManager = (function() {
     return {
       init,
       playSound,
-      loadAllSounds
+      loadAllSounds,
+      playWithVisualFeedback  // 新增
     };
   })();
   

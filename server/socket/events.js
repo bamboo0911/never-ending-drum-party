@@ -25,11 +25,18 @@ module.exports = function(io) {
       });
     });
 
+    // 時間同步請求
+    socket.on('request-server-time', () => {
+      socket.emit('server-time', {
+        serverTime: Date.now()
+      });
+    });
+
     // 打鼓事件
     socket.on('drum-hit', (data) => {
       if (!socket.roomId) return;
       
-      console.log(`用戶 ${socket.userId} 敲擊了: ${data.drumType}`);
+      console.log(`用戶 ${socket.userId} 敲擊了: ${data.drumType}，時間戳: ${data.timestamp}`);
       
       // 廣播給同一房間的其他用戶
       socket.to(socket.roomId).emit('drum-hit', {
