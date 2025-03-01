@@ -1,4 +1,4 @@
-// 零延遲音頻引擎
+// 零延遲音頻引擎 - 增強版合成音色
 const AudioManager = (function() {
     // 音頻上下文
     let audioContext;
@@ -107,71 +107,164 @@ const AudioManager = (function() {
     }
   
     /**
-     * 為每種聲音類型創建最小化聲音樣本
+     * 為每種聲音類型創建更豐富的聲音樣本
      * @param {string} type - 聲音類型
      * @returns {Promise} 包含AudioBuffer的Promise
      */
     function createMinimalSoundSample(type) {
       return new Promise(resolve => {
-        // 最小化音頻配置
+        // 更豐富的音頻配置
         const configs = {
-          'kick': { freq: 60, duration: 0.08, attack: 0.001, decay: 0.08 },
-          'snare': { freq: 200, duration: 0.06, attack: 0.001, decay: 0.05, noise: true },
-          'hihat': { freq: 800, duration: 0.04, attack: 0.001, decay: 0.03, noise: true },
-          'tom': { freq: 150, duration: 0.08, attack: 0.001, decay: 0.08 },
-          'crash': { freq: 1200, duration: 0.1, attack: 0.001, decay: 0.1, noise: true }
+          'kick': { 
+            freqs: [60, 50, 45], // 多頻率增加層次感
+            duration: 0.18, 
+            attack: 0.001, 
+            decay: 0.16, 
+            resonance: 0.9, // 共鳴效果
+            bassPunch: true // 低頻增強
+          },
+          'snare': { 
+            freqs: [200, 180, 500], // 多頻率
+            duration: 0.14, 
+            attack: 0.001, 
+            decay: 0.12, 
+            noise: true,
+            noiseMix: 0.7, // 控制噪聲混合比例
+            snapEnhance: true // 增強啪聲
+          },
+          'hihat': { 
+            freqs: [8000, 10000, 12000], 
+            duration: 0.09, 
+            attack: 0.001, 
+            decay: 0.07, 
+            noise: true,
+            noiseMix: 0.9,
+            filter: {type: 'highpass', freq: 7000},
+            metallic: true // 金屬感
+          },
+          'tom': { 
+            freqs: [150, 130, 100], 
+            duration: 0.2, 
+            attack: 0.001, 
+            decay: 0.18,
+            resonance: 0.8,
+            pitchBend: true // 音高彎曲
+          },
+          'crash': { 
+            freqs: [1200, 1000, 3000, 6000], 
+            duration: 0.25, 
+            attack: 0.001, 
+            decay: 0.22, 
+            noise: true,
+            noiseMix: 0.6,
+            metallic: true,
+            shimmer: true // 閃爍效果
+          }
         };
         
         const config = configs[type] || configs.kick;
         
-        // 創建非常短的音頻樣本
+        // 創建更長的音頻樣本
         const duration = Math.max(MIN_DURATION, config.duration);
         const sampleRate = audioContext.sampleRate;
         const frameCount = Math.ceil(sampleRate * duration);
         const audioBuffer = audioContext.createBuffer(1, frameCount, sampleRate);
         const data = audioBuffer.getChannelData(0);
         
-        // 根據配置生成音頻數據
-        generateAudioData(data, config, sampleRate);
+        // 使用增強的音頻數據生成
+        generateEnhancedAudioData(data, config, sampleRate);
         
         // 存儲並解析
         audioBuffers[type] = audioBuffer;
-        console.log(`創建極簡音頻: ${type}`);
+        console.log(`創建豐富音頻: ${type}`);
         resolve(audioBuffer);
       });
     }
   
     /**
-     * 生成優化的音頻數據
+     * 生成更豐富的音頻數據
      * @param {Float32Array} data - 音頻數據數組
      * @param {Object} config - 音頻配置
      * @param {number} sampleRate - 採樣率
      */
-    function generateAudioData(data, config, sampleRate) {
-      const { freq, attack, decay, noise } = config;
+    function generateEnhancedAudioData(data, config, sampleRate) {
+      const { freqs, attack, decay, noise, noiseMix, resonance, bassPunch, snapEnhance, metallic, pitchBend, shimmer } = config;
       const frameCount = data.length;
       
+      // 主要音頻數據生成
       for (let i = 0; i < frameCount; i++) {
         const t = i / sampleRate;
-        // 快速攻擊衰減包絡
+        
+        // 進階包絡線計算
         let envelope;
         if (t < attack) {
-          envelope = t / attack; // 快速攻擊
+          envelope = Math.pow(t / attack, 2); // 非線性攻擊
         } else {
-          envelope = Math.exp(-(t - attack) / (decay || 0.05)); // 指數衰減
+          // 帶共鳴的衰減
+          const decayTime = t - attack;
+          envelope = Math.exp(-decayTime / (decay || 0.05));
+          
+          // 添加共鳴效果
+          if (resonance && decayTime < decay * 0.5) {
+            envelope *= 1 + (resonance * Math.sin(Math.PI * decayTime / (decay * 0.25)) * 0.5);
+          }
         }
         
-        // 基本波形
-        let sample = Math.sin(2 * Math.PI * freq * t);
+        // 初始化樣本
+        let sample = 0;
         
-        // 添加噪聲（如果需要）
+        // 多頻率合成
+        if (freqs && freqs.length) {
+          for (let f = 0; f < freqs.length; f++) {
+            let freq = freqs[f];
+            
+            // 音高彎曲效果
+            if (pitchBend) {
+              const bendAmount = Math.min(0.9, 1.0 - t / config.duration);
+              freq *= (1.0 + bendAmount * 0.5);
+            }
+            
+            // 添加每個頻率成分
+            const amplitude = 1.0 - (f / freqs.length * 0.5); // 更高頻率的振幅較小
+            sample += Math.sin(2 * Math.PI * freq * t) * amplitude;
+          }
+          
+          // 正規化
+          sample /= freqs.length;
+        }
+        
+        // 添加噪聲
         if (noise) {
-          const noiseAmount = Math.random() * 2 - 1;
-          sample = sample * 0.5 + noiseAmount * 0.5;
+          const noiseAmount = (Math.random() * 2 - 1);
+          const noiseMixValue = noiseMix || 0.5;
+          sample = sample * (1 - noiseMixValue) + noiseAmount * noiseMixValue;
         }
         
-        // 應用包絡
-        data[i] = sample * envelope;
+        // 增強特性
+        if (bassPunch && t < attack + 0.02) {
+          // 低頻增強
+          sample *= 1 + Math.sin(2 * Math.PI * 40 * t) * 0.5;
+        }
+        
+        if (snapEnhance && t < 0.02) {
+          // 啪聲增強
+          sample += (Math.random() * 2 - 1) * (1 - t / 0.02) * 0.5;
+        }
+        
+        if (metallic) {
+          // 金屬感
+          const metallicFreq = t < 0.01 ? 12000 : 8000;
+          sample += Math.sin(2 * Math.PI * metallicFreq * t) * 0.1 * envelope;
+        }
+        
+        if (shimmer && t > 0.01) {
+          // 閃爍效果
+          const shimmerEnv = Math.exp(-t / 0.1);
+          sample += Math.sin(2 * Math.PI * (4000 + 2000 * Math.sin(2 * Math.PI * 10 * t)) * t) * 0.1 * shimmerEnv;
+        }
+        
+        // 應用包絡並在最終寫入前限制範圍
+        data[i] = Math.max(-0.98, Math.min(0.98, sample * envelope));
       }
     }
   
@@ -306,7 +399,7 @@ const AudioManager = (function() {
       init,
       playSound
     };
-  })();
-  
-  // 導出模組
-  window.AudioManager = AudioManager;
+})();
+
+// 導出模組
+window.AudioManager = AudioManager;
