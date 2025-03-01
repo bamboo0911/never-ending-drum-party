@@ -5,7 +5,7 @@ const SocketManager = (function() {
     // Current user info
     const currentUser = {
       id: 'user-' + Math.floor(Math.random() * 10000),
-      position: 'bottom-center', 
+      position: 'bottom-center',
       drumType: 'kick'
     };
     // Current room info
@@ -35,37 +35,37 @@ const SocketManager = (function() {
             reject(new Error('Socket.io not loaded'));
             return;
           }
-          
+  
           // Create connection
           socket = io();
-          
+  
           // Connection successful
           socket.on('connect', () => {
             console.log('[Socket] 已連接到服務器');
             updateConnectionStatus('已連接', true);
             isConnected = true;
             reconnectAttempts = 0;
-            
+  
             // Join default room
             joinRoom(currentRoom.id);
             resolve(true);
           });
-          
+  
           // Connection error
           socket.on('connect_error', (error) => {
             console.error('[Socket] 連接錯誤:', error);
             updateConnectionStatus('連接失敗', false);
-            
+  
             // Try to reconnect
             if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
               reconnectAttempts++;
               updateConnectionStatus(`連接失敗，重試中 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`, false);
-              
+  
               // Clear existing timeout
               if (reconnectTimeout) {
                 clearTimeout(reconnectTimeout);
               }
-              
+  
               // Set new timeout
               reconnectTimeout = setTimeout(() => {
                 socket.connect();
@@ -74,14 +74,14 @@ const SocketManager = (function() {
               reject(error);
             }
           });
-          
+  
           // Disconnection
           socket.on('disconnect', () => {
             console.log('[Socket] 與服務器斷開連接');
             updateConnectionStatus('已斷開', false);
             isConnected = false;
           });
-          
+  
           // Setup event listeners
           setupEventListeners();
         } catch (error) {
@@ -96,68 +96,61 @@ const SocketManager = (function() {
      * Setup event listeners
      */
     function setupEventListeners() {
-      // Make sure socket exists
       if (!socket) return;
-      
+  
       // Room joined
       socket.on('room-joined', (data) => {
         console.log('[Socket] 已加入房間', data);
-        if(!data || !data.users) {
+        if (!data || !data.users) {
           console.error('[Socket] 房間數據無效:', data);
           return;
         }
         updateRoomInfo(`房間: ${currentRoom.id} (${data.users.length} 人在線)`);
-        
-        // Trigger callback
         triggerCallback('onRoomJoined', data);
       });
-      
+  
       // User joined
       socket.on('user-joined', (data) => {
         console.log('[Socket] 用戶加入:', data);
-        if(!data || !data.userId) {
+        if (!data || !data.userId) {
           console.error('[Socket] 用戶數據無效:', data);
           return;
         }
-        
         triggerCallback('onUserJoined', data);
       });
-      
+  
       // User left
       socket.on('user-left', (data) => {
         console.log('[Socket] 用戶離開:', data);
-        if(!data || !data.userId) {
+        if (!data || !data.userId) {
           console.error('[Socket] 用戶數據無效:', data);
           return;
         }
-        
         triggerCallback('onUserLeft', data);
       });
-      
+  
       // Drum hit
       socket.on('drum-hit', (data) => {
         console.log('[Socket] 收到打鼓:', data);
-        if(!data || !data.drumType) {
+        if (!data || !data.drumType) {
           console.error('[Socket] 打鼓數據無效:', data);
           return;
         }
-        
         triggerCallback('onDrumHit', data);
       });
-      
+  
       // Error
       socket.on('error', (error) => {
         console.error('[Socket] 服務器錯誤:', error);
         triggerCallback('onError', error);
       });
-      
+  
       // Server time
       socket.on('server-time', (data) => {
         if (!data || typeof data.serverTime !== 'number') {
           console.error('[Socket] 服務器時間數據無效:', data);
           return;
         }
-        
         triggerCallback('onServerTime', data);
       });
     }
@@ -171,22 +164,20 @@ const SocketManager = (function() {
         console.error('[Socket] 無法加入房間: 未連接到服務器');
         return;
       }
-      
-      if(!roomId) {
+      if (!roomId) {
         console.error('[Socket] 房間ID無效');
         return;
       }
-      
       currentRoom.id = roomId;
-      
-      // Send join room request
+  
+      // Send join room request with complete user info
       socket.emit('join-room', {
         roomId: currentRoom.id,
         userId: currentUser.id,
-        name: currentUser.name,       
-        drumType: currentUser.drumType 
+        name: currentUser.name,
+        drumType: currentUser.drumType
       });
-      
+  
       console.log(`[Socket] 正在加入房間: ${roomId}`);
       updateRoomInfo(`房間: ${roomId} (加入中...)`);
     }
@@ -201,33 +192,27 @@ const SocketManager = (function() {
         console.warn('[Socket] 無法發送打鼓事件: 未連接到服務器');
         return false;
       }
-      
-      if(!drumType) {
+      if (!drumType) {
         console.error('[Socket] 鼓類型無效');
         return false;
       }
-      
       try {
-        // Use current time if LatencyManager is not available
-        const timestamp = window.LatencyManager && window.LatencyManager.isReady 
-          ? window.LatencyManager.adjustEventTime(Date.now()) 
+        const timestamp = window.LatencyManager && window.LatencyManager.isReady
+          ? window.LatencyManager.adjustEventTime(Date.now())
           : Date.now();
-        
-        // Send to server
         socket.emit('drum-hit', {
           drumType: drumType,
           timestamp: timestamp
         });
-        
         return true;
-      } catch(error) {
+      } catch (error) {
         console.error('[Socket] 發送打鼓事件失敗:', error);
         return false;
       }
     }
   
     /**
-     * Update connection status display
+     * Update connection status display and indicator
      * @param {string} status - Status message
      * @param {boolean} isConnected - Connection status
      */
@@ -237,6 +222,7 @@ const SocketManager = (function() {
         statusElement.textContent = `狀態: ${status}`;
         statusElement.style.backgroundColor = isConnected ? '#2e7d32' : '#c62828';
       }
+      updateConnectionIndicator(isConnected);
     }
   
     /**
@@ -256,7 +242,7 @@ const SocketManager = (function() {
      * @param {Function} callback - Callback function
      */
     function on(eventName, callback) {
-      if(!eventName || typeof callback !== 'function') {
+      if (!eventName || typeof callback !== 'function') {
         console.error('[Socket] 無效的事件監聽器參數');
         return;
       }
@@ -283,7 +269,7 @@ const SocketManager = (function() {
      * @param {string} drumType - Drum type
      */
     function setDrumType(drumType) {
-      if(!drumType) {
+      if (!drumType) {
         console.error('[Socket] 鼓類型無效');
         return;
       }
@@ -301,30 +287,19 @@ const SocketManager = (function() {
           reject(new Error('[Socket] 未連接到服務器'));
           return;
         }
-        
-        // Setup one-time listener for this specific request
         const timeoutId = setTimeout(() => {
           socket.off('server-time', timeHandler);
           reject(new Error('[Socket] 時間同步請求超時'));
         }, 3000);
-        
         const timeHandler = (data) => {
-          // Check if this is our response (if requestId was provided)
           if (requestId && data.requestId && data.requestId !== requestId) {
-            return; // Not our response
+            return;
           }
-          
-          // Clear timeout and remove listener
           clearTimeout(timeoutId);
           socket.off('server-time', timeHandler);
-          
           resolve(data);
         };
-        
-        // Add temporary listener
         socket.on('server-time', timeHandler);
-        
-        // Send request
         socket.emit('request-server-time', { requestId });
       });
     }
@@ -336,7 +311,7 @@ const SocketManager = (function() {
     function isSocketConnected() {
       return isConnected;
     }
-
+  
     /**
      * Change instrument
      * @param {string} newInstrument - New instrument type
@@ -346,11 +321,21 @@ const SocketManager = (function() {
         console.warn('[Socket] 無法發送更換樂器事件: 未連接到服務器');
         return;
       }
-      // 發送更換樂器事件，包含使用者 ID 與新樂器資訊
       socket.emit('change-instrument', {
         userId: currentUser.id,
         drumType: newInstrument
       });
+    }
+  
+    /**
+     * Update connection indicator (displayed at the right top corner)
+     * @param {boolean} isConnected - Connection status
+     */
+    function updateConnectionIndicator(isConnected) {
+      const indicator = document.getElementById('connectionIndicator');
+      if (indicator) {
+        indicator.style.backgroundColor = isConnected ? 'green' : 'red';
+      }
     }
   
     // Public API

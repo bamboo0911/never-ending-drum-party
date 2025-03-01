@@ -1,40 +1,172 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: 'Arial', sans-serif;
-    background-color: #121212;
-    color: #f0f0f0;
-    line-height: 1.6;
-    -webkit-overflow-scrolling: touch;
-}
-
-.container {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-h1 {
-    text-align: center;
-    margin-bottom: 20px;
-    color: #f8f8f8;
-}
-
 :root {
+    --background-color: #F0F4F8;       /* 柔和淺藍灰背景 */
+    --container-color: #FFFFFF;        /* 純淨白色容器 */
+    --primary-color: #6C5CE7;          /* 柔和紫色（主色調） */
+    --secondary-color: #00B894;        /* 柔和綠色（次要色） */
+    --accent-color: #FDCC6E;           /* 輔助色，柔和黃色 */
+    --text-color: #2D3436;             /* 深灰色文字 */
+    --border-color: #DFE6E9;           /* 淡灰色邊框 */
     --kick-color: #ff5252;
     --snare-color: #ffeb3b;
     --hihat-color: #4caf50;
     --tom-color: #2196f3;
     --crash-color: #e040fb;
     --highlight-duration: 80ms;
-}
-
-/* 九宮格布局 */
-.drum-grid {
+  }
+  
+  /* 全局設定 */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body {
+    font-family: 'Arial', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    margin: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* 設定頁面容器 */
+  .config-container {
+    background-color: var(--container-color);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+  }
+  
+  /* 標題 */
+  .config-container h2 {
+    margin-bottom: 20px;
+    color: var(--primary-color);
+  }
+  
+  /* 表單 label 與輸入框 */
+  .config-container label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    text-align: left;
+  }
+  
+  .config-container input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    color: var(--text-color);
+    font-size: 16px;
+  }
+  
+  /* Carousel 容器 */
+  .carousel-container {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    max-width: 350px;
+    margin: 0 auto 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--background-color);
+  }
+  
+  /* Carousel 軌道 */
+  .carousel-track {
+    display: flex;
+    transition: transform 0.5s ease;
+  }
+  
+  /* Carousel 每個項目 */
+  .carousel-item {
+    min-width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    padding: 10px;
+  }
+  
+  .carousel-item img {
+    width: 80%;
+    height: auto;
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+  
+  /* 樂器資訊文字 */
+  .instrument-info h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--primary-color);
+  }
+  
+  .instrument-info p {
+    margin: 5px 0 0;
+    font-size: 0.9rem;
+    color: var(--text-color);
+  }
+  
+  /* Carousel 導航按鈕 */
+  .carousel-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  
+  .carousel-nav button {
+    background-color: var(--primary-color);
+    border: none;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .carousel-nav button:hover {
+    background-color: var(--secondary-color);
+  }
+  
+  /* 開始遊戲按鈕 */
+  .config-container button {
+    background-color: var(--primary-color);
+    color: #fff;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .config-container button:hover {
+    background-color: var(--secondary-color);
+  }
+  
+  /* 遊戲頁面容器 */
+  .container {
+    max-width: 1000px;
+    margin: auto;
+    padding: 20px;
+    background-color: var(--container-color);
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  }
+  
+  h1, h2, h3 {
+    color: var(--primary-color);
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  /* 九宮格布局 */
+  .drum-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     grid-template-rows: 1fr 1fr 1fr;
@@ -42,193 +174,134 @@ h1 {
     width: 600px;
     height: 600px;
     margin: 0 auto 30px;
-}
-
-.grid-cell {
-    border: 2px solid #333;
+  }
+  
+  .grid-cell {
+    border: 2px solid var(--border-color);
     border-radius: 8px;
-    background-color: #1e1e1e;
+    background-color: var(--container-color);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     position: relative;
-    transition: none !important;
     padding: 10px;
     text-align: center;
     overflow: hidden;
     transform: translateZ(0);
     z-index: 1;
-}
-
-.grid-cell::after, .grid-cell:hover::after {
-    opacity: 0 !important;
-    display: none !important;
-}
-
-.grid-cell:focus {
-    outline: none !important;
-}
-
-/* 特殊格子樣式 */
-#cell-center {
-    background-color: #2a2a2a;
-    color: #888;
+  }
+  
+  #cell-center {
+    background-color: var(--background-color);
     font-style: italic;
-}
-
-#cell-bottom-center {
-    background-color: #2d4263;
+  }
+  
+  #cell-bottom-center {
+    background-color: var(--primary-color);
+    color: #fff;
     font-weight: bold;
-}
-
-/* 高亮效果 */
-.highlight {
-    background-color: #ffcc00 !important;
-    color: #000 !important;
-    transition: none !important;
-    animation: none !important;
-    transform: none !important;
-}
-
-/* 移除所有複雜的動畫效果和轉變 */
-.pulse-effect, .sound-wave, .volume-meter, 
-.volume-level, .optimized-pulse, .circle-wave {
-    display: none !important;
-}
-
-/* 鼓聲類型指示器 */
-.drum-type-indicator {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.5);
-}
-
-.drum-type-kick {
-    background-color: var(--kick-color);
-}
-
-.drum-type-snare {
-    background-color: var(--snare-color);
-}
-
-.drum-type-hihat {
-    background-color: var(--hihat-color);
-}
-
-.drum-type-tom {
-    background-color: var(--tom-color);
-}
-
-.drum-type-crash {
-    background-color: var(--crash-color);
-}
-
-/* 簡化用戶信息樣式 */
-.user-info {
-    font-size: 0.9em;
-    background-color: rgba(0, 0, 0, 0.5);
-    border-radius: 4px;
-    padding: 3px 8px;
-    margin-bottom: 5px;
-    transition: none !important;
-    border-left: 3px solid #2196f3;
-}
-
-/* 控制區域 */
-.controls {
+  }
+  
+  /* 控制區域 */
+  .controls {
     display: flex;
     justify-content: space-between;
     margin-top: 20px;
-    background-color: #1e1e1e;
+    background-color: var(--container-color);
     padding: 20px;
     border-radius: 8px;
-}
-
-.controls > div {
+    border: 1px solid var(--border-color);
+  }
+  
+  .controls > div {
     flex: 1;
     margin: 0 10px;
-}
-
-.controls h3 {
+  }
+  
+  .controls h3 {
     margin-bottom: 10px;
-    color: #ddd;
-}
-
-select {
+    color: var(--primary-color);
+  }
+  
+  select {
     width: 100%;
     padding: 8px;
-    border: none;
-    background-color: #333;
-    color: #fff;
+    border: 1px solid var(--border-color);
+    background-color: var(--container-color);
+    color: var(--text-color);
     border-radius: 4px;
-}
-
-ul {
+  }
+  
+  button {
+    background-color: var(--primary-color);
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  button:hover {
+    background-color: var(--secondary-color);
+  }
+  
+  ul {
     list-style-type: none;
-}
-
-li {
+  }
+  
+  li {
     margin-bottom: 5px;
-}
-
-.status {
+  }
+  
+  .status {
     text-align: right;
-}
-
-#connectionStatus, #roomInfo {
+  }
+  
+  #connectionStatus, #roomInfo {
     padding: 5px;
     border-radius: 4px;
-    background-color: #333;
+    background-color: var(--secondary-color);
+    color: #fff;
     display: inline-block;
     margin-bottom: 5px;
-}
-
-/* 優化觸摸按鈕 */
-.touch-controls button {
+  }
+  
+  /* 優化觸摸按鈕 */
+  .touch-controls button {
     min-width: 60px;
     min-height: 60px;
     margin: 10px;
     transition: none !important;
     transform: translateZ(0);
-    will-change: auto;
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
-}
-
-.touch-controls button:active {
-    transform: none !important;
-    opacity: 0.8;
-    filter: brightness(1.2);
-}
-
-/* 響應式設計 */
-@media (max-width: 768px) {
+  }
+  
+  /* 響應式設計 */
+  @media (max-width: 768px) {
     .drum-grid {
-        width: 100%;
-        height: auto;
-        aspect-ratio: 1;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1;
     }
     
     .controls {
-        flex-direction: column;
+      flex-direction: column;
     }
     
     .controls > div {
-        margin: 10px 0;
+      margin: 10px 0;
     }
     
     .grid-cell {
-        padding: 5px;
+      padding: 5px;
     }
     
     .user-info {
-        font-size: 0.8em;
-        padding: 2px 5px;
+      font-size: 0.8em;
+      padding: 2px 5px;
     }
-}
+  }

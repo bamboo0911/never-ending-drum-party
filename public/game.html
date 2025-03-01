@@ -1,63 +1,231 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Never Ending Drum Party</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* 設定全頁滿版與背景動畫 */
+    html, body {
+      height: 100vh;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(270deg, #F0F4F8, #6C5CE7, #FDCC6E, #00B894);
+      background-size: 800% 800%;
+      animation: gradientAnimation 30s ease infinite;
+    }
+    @keyframes gradientAnimation {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    /* 主要容器：滿版並垂直置中，並用相對定位 */
+    .container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      padding: 20px;
+      background-color: rgba(255, 255, 255, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    /* 鼓格子容器：用作絕對定位 */
+    .drum-grid {
+      position: relative;
+      width: 600px;
+      height: 600px;
+      margin-top: 20px;
+    }
+    /* 中央方格 */
+    #cell-center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 150px;
+      height: 150px;
+      background-color: var(--container-color);
+      border: 2px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      /* 不做圓形處理 */
+      border-radius: 10px;
+    }
+    /* 其他格子：圓形，均以 transform: translate(-50%, -50%) 定位 */
+    .drum-grid .grid-cell {
+      position: absolute;
+      width: 160px;
+      height: 160px;
+      background-color: var(--container-color);
+      border: 2px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      z-index: 1;
+    }
+    /* 手動設定每個外圍格子的位置（大致以 8 等分圓周排列） */
+    #cell-top-center {
+      left: 50%;
+      top: 10%;
+      transform: translate(-50%, -50%);
+    }
+    #cell-top-right {
+      left: 80%;
+      top: 20%;
+      transform: translate(-50%, -50%);
+    }
+    #cell-middle-right {
+      left: 90%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #cell-bottom-right {
+      left: 80%;
+      top: 80%;
+      transform: translate(-50%, -50%);
+    }
+    #cell-bottom-center {
+      left: 50%;
+      top: 90%;
+      transform: translate(-50%, -50%);
+    }
+    #cell-bottom-left {
+      left: 20%;
+      top: 80%;
+      transform: translate(-50%, -50%);
+    }
+    #cell-middle-left {
+      left: 10%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #cell-top-left {
+      left: 20%;
+      top: 20%;
+      transform: translate(-50%, -50%);
+    }
+    /* 連線狀態指示器：右上角 */
+    .connection-indicator {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background-color: red;
+      z-index: 10;
+    }
+    /* 左上角控制區：包含回上一頁與全螢幕按鈕 */
+    .top-left-controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+    .back-button,
+    .fullscreen-button {
+      background-color: var(--primary-color);
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .back-button:hover,
+    .fullscreen-button:hover {
+      background-color: var(--secondary-color);
+    }
+    /* 演奏說明彈窗 */
+    .modal {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.6);
+      z-index: 1000;
+    }
+    .modal-content {
+      background-color: var(--container-color);
+      padding: 20px 30px;
+      border-radius: 8px;
+      text-align: center;
+      max-width: 90%;
+    }
+    .modal-content h2 {
+      color: var(--primary-color);
+      margin-bottom: 15px;
+    }
+    .modal-content p {
+      margin-bottom: 20px;
+      font-size: 16px;
+      color: var(--text-color);
+    }
+    .modal-content button {
+      background-color: var(--primary-color);
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .modal-content button:hover {
+      background-color: var(--secondary-color);
+    }
+  </style>
 </head>
 <body>
-  <!-- 主容器 -->
   <div class="container">
+    <!-- 左上角控制區 -->
+    <div class="top-left-controls">
+      <button class="back-button" onclick="window.history.back();">回上一頁</button>
+      <button class="fullscreen-button" id="fullscreenBtn">全螢幕</button>
+    </div>
+    <!-- 連線狀態指示器 -->
+    <div id="connectionIndicator" class="connection-indicator"></div>
+    
     <h1>Never Ending Drum Party</h1>
     
-    <!-- 鼓陣列格子 -->
+    <!-- 鼓格子容器 -->
     <div class="drum-grid" id="drumGrid">
       <div class="grid-cell" id="cell-top-left"></div>
       <div class="grid-cell" id="cell-top-center"></div>
       <div class="grid-cell" id="cell-top-right"></div>
-      
       <div class="grid-cell" id="cell-middle-left"></div>
       <div class="grid-cell" id="cell-center">AI 指揮<br>(即將推出)</div>
       <div class="grid-cell" id="cell-middle-right"></div>
-      
       <div class="grid-cell" id="cell-bottom-left"></div>
       <div class="grid-cell" id="cell-bottom-center">你</div>
       <div class="grid-cell" id="cell-bottom-right"></div>
     </div>
-    
-    <!-- 控制區域 -->
-<div class="controls">
-  <!-- 更換樂器選項 -->
-  <div class="instrument-change">
-    <label for="changeInstrumentSelect" style="font-weight: bold; display: block; margin-bottom: 5px;">更換樂器:</label>
-    <select id="changeInstrumentSelect" style="padding: 8px; border-radius: 4px; border: none; background-color: #333; color: #fff;">
-      <option value="kick">底鼓</option>
-      <option value="snare">小鼓</option>
-      <option value="hihat">踩鑔</option>
-      <option value="tom">嗵鼓</option>
-      <option value="crash">鈸</option>
-    </select>
   </div>
-  
-      <!-- 按鍵說明 -->
-      <div class="instructions">
-        <h3>按鍵說明:</h3>
-        <ul>
-          <li><strong>F</strong>: 演奏</li>
-          <li><strong>K</strong>: 演奏</li>
-        </ul>
-      </div>
-      
-      <!-- 狀態顯示 -->
-      <div class="status">
-        <p id="connectionStatus">連接中...</p>
-        <p id="roomInfo">房間: 默認房間</p>
-      </div>
-    </div> 
 
-  <!-- 音頻啟動 Modal (保持原狀) -->
-  <div id="audioStartModal" class="modal">
+  <!-- 演奏說明彈窗 -->
+  <div id="instructionModal" class="modal">
+    <div class="modal-content">
+      <h2>演奏說明</h2>
+      <p>請使用鍵盤的 <strong>F</strong> 或 <strong>K</strong> 來演奏鼓聲。</p>
+      <button id="closeInstructionBtn">開始演奏</button>
+    </div>
+  </div>
+
+  <!-- 音頻啟動彈窗（預設隱藏） -->
+  <div id="audioStartModal" class="modal" style="display: none;">
     <div class="modal-content">
       <h2>Never Ending Drum Party</h2>
       <p>點擊以啟動音頻</p>
@@ -65,11 +233,34 @@
     </div>
   </div>
 
-  <!-- 音頻啟動腳本 -->
   <script>
+    // 演奏說明彈窗關閉
+    document.getElementById('closeInstructionBtn').addEventListener('click', function() {
+      document.getElementById('instructionModal').style.display = 'none';
+    });
+    // 音頻啟動彈窗事件
     document.getElementById('startAudioBtn').addEventListener('click', function() {
       document.getElementById('audioStartModal').style.display = 'none';
     });
+    // 全螢幕按鈕處理
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    fullscreenBtn.addEventListener('click', function() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+          fullscreenBtn.textContent = '退出全螢幕';
+        }).catch((err) => {
+          console.error(`無法啟動全螢幕: ${err.message}`);
+        });
+      } else {
+        document.exitFullscreen().then(() => {
+          fullscreenBtn.textContent = '全螢幕';
+        }).catch((err) => {
+          console.error(`無法退出全螢幕: ${err.message}`);
+        });
+      }
+    });
+    // 示例：當連線成功後更新連線指示器（可在 SocketManager 中更新）
+    // document.getElementById('connectionIndicator').style.backgroundColor = 'green';
   </script>
   
   <!-- 依賴腳本 -->
