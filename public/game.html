@@ -45,8 +45,8 @@
       position: absolute;
       left: 50%;
       top: 50%;
-      width: 150px;
-      height: 150px;
+      width: 200px;
+      height: 200px;
       background-color: var(--container-color);
       border: 2px solid var(--border-color);
       display: flex;
@@ -187,6 +187,23 @@
     .modal-content button:hover {
       background-color: var(--secondary-color);
     }
+    /* 全螢幕相關樣式 */
+    .fullscreen-status {
+      position: fixed;
+      top: 70px;
+      left: 20px;
+      padding: 5px 10px;
+      background-color: rgba(0,0,0,0.5);
+      color: white;
+      border-radius: 5px;
+      font-size: 12px;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    .fullscreen-status.show {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -213,6 +230,9 @@
       <div class="grid-cell" id="cell-bottom-center">你</div>
       <div class="grid-cell" id="cell-bottom-right"></div>
     </div>
+    
+    <!-- 全螢幕狀態提示 -->
+    <div id="fullscreenStatus" class="fullscreen-status"></div>
   </div>
 
   <!-- 演奏說明彈窗 -->
@@ -225,41 +245,99 @@
     </div>
   </div>
 
-  <script>
-    // 演奏說明彈窗關閉
-    document.getElementById('closeInstructionBtn').addEventListener('click', function() {
-      document.getElementById('instructionModal').style.display = 'none';
-    });
-    // 音頻啟動彈窗事件
-    document.getElementById('startAudioBtn').addEventListener('click', function() {
-      document.getElementById('audioStartModal').style.display = 'none';
-    });
-    // 全螢幕按鈕處理
-    const fullscreenBtn = document.getElementById('fullscreenBtn');
-    fullscreenBtn.addEventListener('click', function() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().then(() => {
-          fullscreenBtn.textContent = '退出全螢幕';
-        }).catch((err) => {
-          console.error(`無法啟動全螢幕: ${err.message}`);
-        });
-      } else {
-        document.exitFullscreen().then(() => {
-          fullscreenBtn.textContent = '全螢幕';
-        }).catch((err) => {
-          console.error(`無法退出全螢幕: ${err.message}`);
-        });
-      }
-    });
-    // 示例：當連線成功後更新連線指示器（可在 SocketManager 中更新）
-    // document.getElementById('connectionIndicator').style.backgroundColor = 'green';
-  </script>
-  
   <!-- 依賴腳本 -->
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/audio.js"></script>
   <script src="/js/socket.js"></script>
   <script src="/js/ui.js"></script>
   <script src="/js/main.js"></script>
+  
+  <script>
+    // 演奏說明彈窗關閉
+    document.getElementById('closeInstructionBtn').addEventListener('click', function() {
+      document.getElementById('instructionModal').style.display = 'none';
+    });
+
+    // 全螢幕功能處理
+    (function() {
+      const fullscreenBtn = document.getElementById('fullscreenBtn');
+      const fullscreenStatusDiv = document.getElementById('fullscreenStatus');
+      let isInFullscreen = false;
+      
+      // 顯示全螢幕狀態訊息
+      function showFullscreenStatus(message) {
+        fullscreenStatusDiv.textContent = message;
+        fullscreenStatusDiv.classList.add('show');
+        setTimeout(() => {
+          fullscreenStatusDiv.classList.remove('show');
+        }, 2000);
+      }
+      
+      // 檢查當前瀏覽器全螢幕支援
+      function checkFullscreenSupport() {
+        const docEl = document.documentElement;
+        
+        if (docEl.requestFullscreen) {
+          return { request: 'requestFullscreen', exit: 'exitFullscreen', element: 'fullscreenElement', change: 'fullscreenchange' };
+        } else if (docEl.webkitRequestFullscreen) {
+          return { request: 'webkitRequestFullscreen', exit: 'webkitExitFullscreen', element: 'webkitFullscreenElement', change: 'webkitfullscreenchange' };
+        } else if (docEl.mozRequestFullScreen) {
+          return { request: 'mozRequestFullScreen', exit: 'mozCancelFullScreen', element: 'mozFullScreenElement', change: 'mozfullscreenchange' };
+        } else if (docEl.msRequestFullscreen) {
+          return { request: 'msRequestFullscreen', exit: 'msExitFullscreen', element: 'msFullscreenElement', change: 'MSFullscreenChange' };
+        }
+        
+        return null;
+      }
+      
+      const fsAPI = checkFullscreenSupport();
+      
+      if (!fsAPI) {
+        console.warn('此瀏覽器不支援全螢幕 API');
+        fullscreenBtn.disabled = true;
+        fullscreenBtn.textContent = '不支援全螢幕';
+        return;
+      }
+      
+      // 監聽全螢幕狀態變化
+      document.addEventListener(fsAPI.change, function() {
+        isInFullscreen = !!document[fsAPI.element];
+        fullscreenBtn.textContent = isInFullscreen ? '退出全螢幕' : '全螢幕';
+      });
+      
+      // 全螢幕按鈕點擊事件
+      fullscreenBtn.addEventListener('click', function() {
+        try {
+          if (!document[fsAPI.element]) {
+            // 進入全螢幕
+            const docEl = document.documentElement;
+            const requestMethod = docEl[fsAPI.request];
+            
+            if (requestMethod) {
+              requestMethod.call(docEl);
+              console.log('已請求進入全螢幕模式');
+            } else {
+              showFullscreenStatus('無法進入全螢幕，請嘗試使用其他瀏覽器');
+              console.error('全螢幕請求方法不存在', fsAPI.request);
+            }
+          } else {
+            // 退出全螢幕
+            const exitMethod = document[fsAPI.exit];
+            
+            if (exitMethod) {
+              exitMethod.call(document);
+              console.log('已請求退出全螢幕模式');
+            } else {
+              showFullscreenStatus('無法退出全螢幕，請嘗試按 ESC 鍵');
+              console.error('退出全螢幕方法不存在', fsAPI.exit);
+            }
+          }
+        } catch (error) {
+          console.error('全螢幕操作失敗:', error);
+          showFullscreenStatus('全螢幕操作失敗: ' + error.message);
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

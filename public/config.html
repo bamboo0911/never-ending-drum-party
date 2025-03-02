@@ -32,17 +32,17 @@
       margin: auto;
       width: 100%;
       max-width: 450px;
-      padding: 30px 20px;
+      padding: 20px; /* 減少內邊距 */
       background-color: var(--container-color);
       border-radius: 10px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
     .config-container h2 {
-      margin-bottom: 20px;
+      margin-bottom: 15px; /* 減少標題的下邊距 */
       color: var(--primary-color);
     }
     .form-section {
-      margin-bottom: 30px;
+      margin-bottom: 20px; /* 減少表單區塊的下邊距 */
     }
     .form-section label {
       font-weight: bold;
@@ -61,7 +61,7 @@
     }
     /* Carousel 區域 */
     .carousel-container {
-      margin-bottom: 30px;
+      margin-bottom: 20px; /* 減少下邊距 */
     }
     .carousel-track {
       display: flex;
@@ -74,10 +74,10 @@
       padding: 10px;
     }
     .carousel-item img {
-      width: 80%;
+      width: 70%; /* 稍微縮小圖片 */
       height: auto;
       border-radius: 10px;
-      margin-bottom: 10px;
+      margin-bottom: 5px; /* 減少底部邊距 */
     }
     .instrument-info h3 {
       margin: 0;
@@ -85,7 +85,7 @@
       color: var(--primary-color);
     }
     .instrument-info p {
-      margin: 5px 0 0;
+      margin: 2px 0 5px; /* 減少段落上下間距 */
       font-size: 0.9rem;
       color: var(--text-color);
     }
@@ -121,6 +121,90 @@
     #startGameBtn:hover {
       background-color: var(--secondary-color);
     }
+    /* 確保導航欄按鈕樣式一致性 */
+    .carousel-nav button {
+      background-color: var(--primary-color);
+      border: none;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    
+    .carousel-nav button:hover {
+      background-color: var(--secondary-color);
+    }
+    
+    /* 音頻預覽按鈕樣式 - 無背景圖標 */
+    .preview-button {
+      background: transparent !important;
+      background-color: transparent !important;
+      color: var(--primary-color);
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0;
+      cursor: pointer;
+      font-size: 28px; /* 增大圖標尺寸 */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    .preview-button:hover {
+      color: var(--secondary-color);
+      transform: scale(1.2);
+    }
+    .preview-button:active {
+      transform: scale(0.9);
+    }
+    /* 音頻預覽容器 */
+    .preview-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* 調整導航欄與音頻預覽的布局 */
+    .carousel-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 15px;
+    }
+    /* 音頻初始化彈窗 */
+    .audio-modal {
+      display: flex;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .audio-modal-content {
+      background-color: white;
+      padding: 30px;
+      border-radius: 10px;
+      text-align: center;
+      max-width: 90%;
+    }
+    .audio-modal-content h3 {
+      margin-top: 0;
+      color: var(--primary-color);
+    }
+    .audio-modal-content button {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
@@ -142,6 +226,7 @@
           <div class="instrument-info">
             <h3>Base Drum</h3>
             <p>深沉且有力的節奏，提供強勁的節拍。</p>
+
           </div>
         </div>
         <!-- 樂器項目：小鼓 -->
@@ -150,6 +235,7 @@
           <div class="instrument-info">
             <h3>Snare Drum</h3>
             <p>清脆而有節奏感的敲擊聲，塑造細膩節奏。</p>
+
           </div>
         </div>
         <!-- 樂器項目：踩鑔 -->
@@ -158,6 +244,7 @@
             <div class="instrument-info">
             <h3>Hihat</h3>
             <p>迅速而清脆的音符，增添節奏的流動性。</p>
+
           </div>
         </div>
         <!-- 樂器項目：嗵鼓 -->
@@ -166,6 +253,7 @@
           <div class="instrument-info">
             <h3>Tom</h3>
             <p>中低頻的共鳴，給予音樂豐富層次感。</p>
+
           </div>
         </div>
         <!-- 樂器項目：鈸 -->
@@ -174,12 +262,16 @@
           <div class="instrument-info">
             <h3>Crash</h3>
             <p>明亮且震撼的打擊，適合作為強調音效。</p>
+
           </div>
         </div>
       </div>
-      <!-- Carousel 導航按鈕 -->
+      <!-- Carousel 導航按鈕與聲音預覽 -->
       <div class="carousel-nav">
         <button id="prevBtn">&lt;</button>
+        <div class="preview-container">
+          <button id="previewSoundBtn" class="preview-button" data-sound="" style="background: transparent !important; background-color: transparent !important; box-shadow: none !important; font-size: 24px;">🔊</button>
+        </div>
         <button id="nextBtn">&gt;</button>
       </div>
     </div>
@@ -190,6 +282,18 @@
     <button id="startGameBtn">Join Session</button>
   </div>
 
+  <!-- 音頻初始化彈窗 -->
+  <div id="audioStartModal" class="audio-modal">
+    <div class="audio-modal-content">
+      <h3>音頻初始化</h3>
+      <p>請點擊下方按鈕以啟用音頻播放功能</p>
+      <p>這樣您可以試聽並選擇您喜歡的樂器</p>
+      <button id="startAudioBtn">啟用音頻</button>
+    </div>
+  </div>
+
+  <!-- 載入音頻管理模組 -->
+  <script src="/js/audio.js"></script>
   <script>
     // Carousel 功能
     const track = document.querySelector('.carousel-track');
@@ -198,6 +302,7 @@
     const nextButton = document.getElementById('nextBtn');
     const selectedInstrumentInput = document.getElementById('selectedInstrument');
     let currentIndex = 0;
+    let audioInitialized = false;
 
     function updateCarousel() {
       const slideWidth = items[0].getBoundingClientRect().width;
@@ -205,6 +310,12 @@
       // 更新隱藏的 input 內容
       const currentItem = items[currentIndex];
       selectedInstrumentInput.value = currentItem.getAttribute('data-instrument');
+      
+      // 更新音效預覽按鈕對應的樂器類型
+      const previewButton = document.getElementById('previewSoundBtn');
+      if (previewButton) {
+        previewButton.setAttribute('data-sound', currentItem.getAttribute('data-instrument'));
+      }
     }
 
     nextButton.addEventListener('click', () => {
@@ -254,6 +365,75 @@
       localStorage.setItem('instrument', instrument);
       // 導向遊戲頁面（例如 game.html）
       window.location.href = '/game.html';
+    });
+
+    // 音頻初始化
+    document.getElementById('startAudioBtn').addEventListener('click', function() {
+      initializeAudio();
+      document.getElementById('audioStartModal').style.display = 'none';
+    });
+
+    // 初始化音頻引擎
+    async function initializeAudio() {
+      try {
+        const result = await window.AudioManager.init();
+        audioInitialized = result;
+        console.log(result ? '音頻已就緒' : '音頻初始化失敗');
+        
+        // 啟用音效預覽按鈕
+        setupSoundPreview();
+      } catch (error) {
+        console.error('音頻初始化錯誤:', error);
+      }
+    }
+
+    // 設置音效預覽按鈕
+    function setupSoundPreview() {
+      const previewButton = document.getElementById('previewSoundBtn');
+      
+      // 更新預覽按鈕的樂器類型
+      function updatePreviewButton() {
+        const currentItem = items[currentIndex];
+        const instrumentType = currentItem.getAttribute('data-instrument');
+        previewButton.setAttribute('data-sound', instrumentType);
+      }
+      
+      // 初始更新
+      updatePreviewButton();
+      
+      // 當Carousel切換時更新按鈕
+      prevButton.addEventListener('click', updatePreviewButton);
+      nextButton.addEventListener('click', updatePreviewButton);
+      
+      // 綁定點擊事件
+      previewButton.addEventListener('click', function() {
+        const soundType = this.getAttribute('data-sound');
+        if (audioInitialized && soundType) {
+          window.AudioManager.playSound(soundType);
+          
+          // 音效播放時的視覺反饋
+          const originalColor = this.style.color;
+          this.style.color = 'var(--' + soundType + '-color)';
+          
+          setTimeout(() => {
+            this.style.color = originalColor;
+          }, 200);
+        } else if (!audioInitialized) {
+          alert('請先啟用音頻功能');
+          document.getElementById('audioStartModal').style.display = 'flex';
+        }
+      });
+    }
+
+    // 文檔加載完成時，檢查是否自動初始化音頻
+    document.addEventListener('DOMContentLoaded', function() {
+      // 當用戶與頁面有互動時，可以自動初始化音頻
+      document.addEventListener('click', function audioClickHandler() {
+        if (!audioInitialized) {
+          document.getElementById('audioStartModal').style.display = 'flex';
+          document.removeEventListener('click', audioClickHandler);
+        }
+      });
     });
   </script>
 </body>
