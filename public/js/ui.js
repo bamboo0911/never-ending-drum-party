@@ -42,16 +42,7 @@ const UIManager = (function() {
       }, 2000);
       
       // 確保本地用戶格子是正確的
-      const bottomCenterCell = document.getElementById('cell-bottom-center');
-      if (bottomCenterCell && window.SocketManager && window.SocketManager.currentUser) {
-        const playerName = window.SocketManager.currentUser.name || 
-                          localStorage.getItem('playerName') || 
-                          '您';
-                           
-        if (!bottomCenterCell.querySelector('.user-info')) {
-          bottomCenterCell.innerHTML = `<div class="user-info">${playerName}</div>`;
-        }
-      }
+      ensureLocalUserCell();
       
       console.log('UI管理器初始化完成');
       return true;
@@ -158,7 +149,7 @@ const UIManager = (function() {
     }
   
     /**
-     * 添加用戶到格子 - 確保不使用 bottom-center
+     * 添加用戶到格子 - 现在只在名称后添加王冠图标
      */
     function addUserToCell(user) {
         // 確保有位置信息
@@ -191,30 +182,38 @@ const UIManager = (function() {
         // 使用玩家的 name，若無則回退到從 ID 中提取數字
         const displayName = user.name ? user.name : `用戶 ${user.id.split('-')[1] || user.id}`;
         
-        console.log(`添加用戶 ${displayName} (${user.id}) 到格子 ${cellId}`);
+        // 检查是否是房主
+        const isHost = window.HostManager && 
+                     window.HostManager.getCurrentHostId && 
+                     window.HostManager.getCurrentHostId() === user.id;
         
-        // 設置格子內容
-        cell.innerHTML = `<div class="user-info">${displayName}</div>`;
+        // 创建HTML内容 - 包含可选的房主标识
+        const hostBadge = isHost ? '<span class="host-badge">👑</span>' : '';
+        const nameClass = isHost ? 'host-name' : '';
+        
+        // 获取乐器图标
+        const instrumentIcon = getInstrumentIcon(user.drumType);
+        
+        console.log(`添加用戶 ${displayName} (${user.id}) 到格子 ${cellId}, 是否房主: ${isHost}`);
+        
+        // 設置格子內容 - 直接在名称后添加王冠
+        cell.innerHTML = `
+          <div class="user-info">
+            <span class="${nameClass}">${displayName}${hostBadge}</span>
+            <span class="instrument-icon">${instrumentIcon}</span>
+          </div>
+        `;
         cell.setAttribute('data-user', user.id);
         cell.classList.add('occupied');
         
+        // 不再在格子上添加host-cell类
+        if (isHost) {
+          console.log(`用户 ${displayName} 是房主，已添加房主标识`);
+        }
+        
         // 記錄映射
         userCellMap.set(user.id, cellId);
-        
-        // 添加房主標記 (如果需要)
-        if (window.HostManager && 
-            window.HostManager.getCurrentHostId && 
-            window.HostManager.getCurrentHostId() === user.id) {
-          cell.classList.add('host-cell');
-          const userInfo = cell.querySelector('.user-info');
-          if (userInfo && !userInfo.querySelector('.host-badge')) {
-            const badge = document.createElement('span');
-            badge.className = 'host-badge';
-            badge.textContent = '👑 指揮官';
-            userInfo.appendChild(badge);
-          }
-        }
-      }
+    }
   
     /**
      * 從格子移除用戶 - 確保不移除本地用戶
@@ -364,7 +363,7 @@ const UIManager = (function() {
     }
     
     /**
-     * 確保本地用戶格子存在且正確
+     * 确保本地用户格子显示正确 - 同样添加王冠图标
      */
     function ensureLocalUserCell() {
       const bottomCenterCell = document.getElementById('cell-bottom-center');
@@ -378,29 +377,84 @@ const UIManager = (function() {
                         localStorage.getItem('playerName') || 
                         '您';
       
-      // 檢查格子是否已包含用戶信息
-      if (!bottomCenterCell.querySelector('.user-info')) {
-        bottomCenterCell.innerHTML = `<div class="user-info">${playerName}</div>`;
-        bottomCenterCell.setAttribute('data-user', localUser.id);
-        console.log(`確保本地用戶 ${playerName} 在 bottom-center 格子`);
+      // 检查是否是房主
+      const isHost = window.HostManager && 
+                   window.HostManager.isUserHost && 
+                   window.HostManager.isUserHost();
+                   
+      // 创建房主标识
+      const hostBadge = isHost ? '<span class="host-badge">👑</span>' : '';
+      const nameClass = isHost ? 'host-name' : '';
+      
+      // 获取乐器图标
+      const instrumentIcon = getInstrumentIcon(localUser.drumType);
+      
+      // 設置格子內容
+      bottomCenterCell.innerHTML = `
+        <div class="user-info">
+          <span class="${nameClass}">${playerName}${hostBadge}</span>
+          <span class="instrument-icon">${instrumentIcon}</span>
+        </div>
+      `;
+      bottomCenterCell.setAttribute('data-user', localUser.id);
+      
+      console.log(`確保本地用戶 ${playerName} 在 bottom-center 格子，是否房主: ${isHost}`);
+    }
+  
+    /**
+     * 更新房主指示器 - 只更新名称旁的图标
+     */
+    function updateHostIndicators(hostId) {
+      // 如果没有传入hostId，则尝试从HostManager获取
+      if (!hostId && window.HostManager && window.HostManager.getCurrentHostId) {
+        hostId = window.HostManager.getCurrentHostId();
       }
       
-      // 添加本地用戶房主標記
-      if (window.HostManager && 
-          window.HostManager.isUserHost && 
-          window.HostManager.isUserHost()) {
-        bottomCenterCell.classList.add('host-cell');
+      if (!hostId) {
+        console.warn('无法更新房主指示器: 没有房主ID');
+        return;
+      }
+      
+      console.log(`更新房主指示器，房主ID: ${hostId}`);
+      
+      // 检查本地用户是否为房主
+      const isLocalUserHost = hostId === window.SocketManager?.currentUser?.id;
+      
+      // 更新本地用户格子
+      if (isLocalUserHost) {
+        ensureLocalUserCell();
+      }
+      
+      // 更新所有远程用户格子
+      document.querySelectorAll('.grid-cell').forEach(cell => {
+        const userId = cell.getAttribute('data-user');
+        if (!userId || userId === window.SocketManager?.currentUser?.id) return;
         
-        // 添加房主標記
-        const userInfo = bottomCenterCell.querySelector('.user-info');
-        if (userInfo && !userInfo.querySelector('.host-badge')) {
+        const isHost = userId === hostId;
+        const userInfo = cell.querySelector('.user-info');
+        if (!userInfo) return;
+        
+        // 获取现有名称
+        let nameEl = userInfo.querySelector('span:first-child');
+        if (!nameEl) return;
+        
+        // 移除现有的房主标识
+        const existingBadge = nameEl.querySelector('.host-badge');
+        if (existingBadge) {
+          existingBadge.remove();
+        }
+        
+        // 如果是房主，添加标识
+        if (isHost) {
+          nameEl.classList.add('host-name');
           const badge = document.createElement('span');
           badge.className = 'host-badge';
-          badge.textContent = '👑 指揮官';
-          userInfo.appendChild(badge);
-          console.log('已添加本地用戶房主標記');
+          badge.textContent = '👑';
+          nameEl.appendChild(badge);
+        } else {
+          nameEl.classList.remove('host-name');
         }
-      }
+      });
     }
   
     // 暴露公共方法
@@ -413,7 +467,8 @@ const UIManager = (function() {
       handleSoundPlayed,
       getCellId,
       forceRefreshCells,
-      ensureLocalUserCell  // 新增：確保本地用戶格子
+      ensureLocalUserCell,
+      updateHostIndicators
     };
   })();
   
