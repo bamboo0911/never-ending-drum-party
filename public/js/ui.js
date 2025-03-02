@@ -1,4 +1,4 @@
-// 極簡化的UI管理模組
+// 改進的UI管理模組 - 確保正確處理房間成員和位置
 const UIManager = (function() {
     // 用戶與格子的映射
     const userCellMap = new Map();
@@ -6,11 +6,15 @@ const UIManager = (function() {
     const HIGHLIGHT_DURATION = 80;
     // 活躍的動畫計時器
     const activeTimers = new Map();
+    // 調試模式
+    const DEBUG_MODE = false;
   
     /**
      * 初始化用戶界面
      */
     function init() {
+      console.log('UI管理器初始化中...');
+      
       // 設置鼓聲選擇下拉框的事件處理
       const drumSelect = document.getElementById('drumSelect');
       if (drumSelect) {
@@ -22,32 +26,122 @@ const UIManager = (function() {
         });
       }
       
-      console.log('用戶界面已初始化');
+      // 監聽房間加入和用戶加入事件，確保UI更新
+      if (window.SocketManager) {
+        window.SocketManager.on('room-joined', handleRoomJoined);
+        window.SocketManager.on('user-joined', handleUserJoined);
+        window.SocketManager.on('user-left', handleUserLeft);
+        window.SocketManager.on('room-users-updated', handleRoomUsersUpdated);
+      }
+      
+      // 自動請求房間成員列表（確保新加入用戶能看到所有成員）
+      setTimeout(() => {
+        if (window.SocketManager && typeof window.SocketManager.requestRoomUsers === 'function') {
+          window.SocketManager.requestRoomUsers();
+        }
+      }, 2000);
+      
+      // 確保本地用戶格子是正確的
+      const bottomCenterCell = document.getElementById('cell-bottom-center');
+      if (bottomCenterCell && window.SocketManager && window.SocketManager.currentUser) {
+        const playerName = window.SocketManager.currentUser.name || 
+                          localStorage.getItem('playerName') || 
+                          '您';
+                           
+        if (!bottomCenterCell.querySelector('.user-info')) {
+          bottomCenterCell.innerHTML = `<div class="user-info">${playerName}</div>`;
+        }
+      }
+      
+      console.log('UI管理器初始化完成');
       return true;
+    }
+    
+    /**
+     * 處理房間加入事件
+     */
+    function handleRoomJoined(data) {
+      console.log('UI處理房間加入事件:', data);
+      if (data && Array.isArray(data.users)) {
+        updateUserCells(data.users);
+      }
+    }
+    
+    /**
+     * 處理用戶加入事件
+     */
+    function handleUserJoined(data) {
+      console.log('UI處理用戶加入事件:', data);
+      if (data && data.userId) {
+        addUserToCell(data);
+      }
+    }
+    
+    /**
+     * 處理用戶離開事件
+     */
+    function handleUserLeft(data) {
+      console.log('UI處理用戶離開事件:', data);
+      if (data && data.userId) {
+        removeUserFromCell(data.userId);
+      }
+    }
+    
+    /**
+     * 處理房間用戶列表更新事件
+     */
+    function handleRoomUsersUpdated(data) {
+      console.log('UI處理房間用戶列表更新:', data);
+      if (data && Array.isArray(data.users)) {
+        updateUserCells(data.users);
+      }
     }
   
     /**
-     * 更新所有用戶格子
+     * 更新所有用戶格子 - 確保不覆蓋本地用戶格子
      */
     function updateUserCells(users) {
+        console.log('更新所有用戶格子，總人數:', users.length);
+        
         // 清空現有映射
         userCellMap.clear();
         
-        // 重置格子內容
+        // 重置格子內容 - 確保不清除本地用戶格子
         resetGridCells();
         
-        // 添加用戶到格子，直接使用 user 物件
+        // 確保本地用戶ID
+        const localUserId = window.SocketManager?.currentUser?.id;
+        
+        // 添加用戶到格子，跳過當前用戶
         if (users && Array.isArray(users)) {
           users.forEach(user => {
-            if (user.id !== window.SocketManager?.currentUser?.id) {
-              addUserToCell(user);
+            // 跳過本地用戶
+            if (user.id === localUserId) {
+              console.log(`跳過本地用戶 ${user.id}`);
+              return;
             }
+            
+            // 禁止其他用戶佔用 bottom-center 位置
+            if (user.position === 'bottom-center') {
+              console.warn(`用戶 ${user.id} 的位置是 bottom-center，這應該被保留給本地用戶！跳過添加`);
+              return;
+            }
+            
+            console.log(`添加用戶 ${user.id} 到格子 ${user.position || '未知位置'}`);
+            addUserToCell(user);
           });
+        }
+        
+        // 添加房主標記（如果有HostManager）
+        if (window.HostManager && typeof window.HostManager.updateHostIndicators === 'function') {
+          setTimeout(() => {
+            window.HostManager.updateHostIndicators();
+          }, 300);
         }
       }
   
     /**
-     * 重置所有格子
+     * 重置所有格子 - 確保不清除 bottom-center
      */
     function resetGridCells() {
       document.querySelectorAll('.grid-cell').forEach(cell => {
@@ -56,45 +150,104 @@ const UIManager = (function() {
           cell.innerHTML = '';
           cell.setAttribute('data-user', '');
           cell.classList.remove('occupied');
+          cell.classList.remove('host-cell');
         }
       });
+      
+      if (DEBUG_MODE) console.log('格子已重置（保留本地用戶格子）');
     }
   
     /**
-     * 添加用戶到格子
+     * 添加用戶到格子 - 確保不使用 bottom-center
      */
     function addUserToCell(user) {
-        const cellId = `cell-${user.position}`;
+        // 確保有位置信息
+        const position = user.position;
+        if (!position) {
+          console.warn(`用戶 ${user.id} 沒有位置信息，無法添加到格子`);
+          return;
+        }
+        
+        // 禁止使用 bottom-center
+        if (position === 'bottom-center') {
+          console.warn(`嘗試將用戶 ${user.id} 添加到 bottom-center，這是不允許的！`);
+          return;
+        }
+        
+        const cellId = `cell-${position}`;
         const cell = document.getElementById(cellId);
         
-        if (cell) {
-          // 使用玩家的 name，若無則回退到從 ID 中提取數字
-          const displayName = user.name ? user.name : `用戶 ${user.id.split('-')[1] || user.id}`;
-          
-          // 設置格子內容
-          cell.innerHTML = `<div class="user-info">${displayName}</div>`;
-          cell.setAttribute('data-user', user.id);
-          cell.classList.add('occupied');
-          
-          // 記錄映射
-          userCellMap.set(user.id, cellId);
+        if (!cell) {
+          console.warn(`找不到格子 ${cellId}`);
+          return;
+        }
+        
+        // 確保這不是本地用戶格子
+        if (cellId === 'cell-bottom-center') {
+          console.warn(`嘗試將用戶 ${user.id} 添加到本地用戶格子，已阻止`);
+          return;
+        }
+        
+        // 使用玩家的 name，若無則回退到從 ID 中提取數字
+        const displayName = user.name ? user.name : `用戶 ${user.id.split('-')[1] || user.id}`;
+        
+        console.log(`添加用戶 ${displayName} (${user.id}) 到格子 ${cellId}`);
+        
+        // 設置格子內容
+        cell.innerHTML = `<div class="user-info">${displayName}</div>`;
+        cell.setAttribute('data-user', user.id);
+        cell.classList.add('occupied');
+        
+        // 記錄映射
+        userCellMap.set(user.id, cellId);
+        
+        // 添加房主標記 (如果需要)
+        if (window.HostManager && 
+            window.HostManager.getCurrentHostId && 
+            window.HostManager.getCurrentHostId() === user.id) {
+          cell.classList.add('host-cell');
+          const userInfo = cell.querySelector('.user-info');
+          if (userInfo && !userInfo.querySelector('.host-badge')) {
+            const badge = document.createElement('span');
+            badge.className = 'host-badge';
+            badge.textContent = '👑 指揮官';
+            userInfo.appendChild(badge);
+          }
         }
       }
   
     /**
-     * 從格子移除用戶
+     * 從格子移除用戶 - 確保不移除本地用戶
      */
     function removeUserFromCell(userId) {
+      // 確保不是本地用戶
+      if (userId === window.SocketManager?.currentUser?.id) {
+        console.warn(`嘗試移除本地用戶 ${userId}，已阻止`);
+        return;
+      }
+      
+      console.log(`嘗試從格子移除用戶 ${userId}`);
+      
       const cellId = userCellMap.get(userId);
       if (cellId) {
+        // 再次檢查不是本地用戶格子
+        if (cellId === 'cell-bottom-center') {
+          console.warn(`嘗試清除本地用戶格子，已阻止`);
+          return;
+        }
+        
         const cell = document.getElementById(cellId);
         if (cell) {
           cell.innerHTML = '';
           cell.setAttribute('data-user', '');
           cell.classList.remove('occupied');
+          cell.classList.remove('host-cell');
+          console.log(`已從格子 ${cellId} 移除用戶 ${userId}`);
         }
         
         userCellMap.delete(userId);
+      } else {
+        console.log(`找不到用戶 ${userId} 對應的格子`);
       }
     }
   
@@ -182,7 +335,72 @@ const UIManager = (function() {
      * @returns {string|null} 對應的格子 ID 或 null
      */
     function getCellId(userId) {
+      // 檢查是否為本地用戶
+      if (userId === window.SocketManager?.currentUser?.id) {
+        return 'cell-bottom-center';
+      }
+      
       return userCellMap.get(userId) || null;
+    }
+    
+    /**
+     * 強制刷新所有格子
+     */
+    function forceRefreshCells() {
+      console.log('強制刷新所有格子...');
+      
+      // 請求最新的房間成員列表
+      if (window.SocketManager && typeof window.SocketManager.requestRoomUsers === 'function') {
+        window.SocketManager.requestRoomUsers();
+      }
+      
+      // 使用當前的用戶列表刷新
+      if (window.SocketManager && window.SocketManager.currentRoom && Array.isArray(window.SocketManager.currentRoom.users)) {
+        updateUserCells(window.SocketManager.currentRoom.users);
+      }
+      
+      // 確保本地用戶格子是正確的
+      ensureLocalUserCell();
+    }
+    
+    /**
+     * 確保本地用戶格子存在且正確
+     */
+    function ensureLocalUserCell() {
+      const bottomCenterCell = document.getElementById('cell-bottom-center');
+      if (!bottomCenterCell) return;
+      
+      // 獲取本地用戶名稱
+      const localUser = window.SocketManager?.currentUser;
+      if (!localUser) return;
+      
+      const playerName = localUser.name || 
+                        localStorage.getItem('playerName') || 
+                        '您';
+      
+      // 檢查格子是否已包含用戶信息
+      if (!bottomCenterCell.querySelector('.user-info')) {
+        bottomCenterCell.innerHTML = `<div class="user-info">${playerName}</div>`;
+        bottomCenterCell.setAttribute('data-user', localUser.id);
+        console.log(`確保本地用戶 ${playerName} 在 bottom-center 格子`);
+      }
+      
+      // 添加本地用戶房主標記
+      if (window.HostManager && 
+          window.HostManager.isUserHost && 
+          window.HostManager.isUserHost()) {
+        bottomCenterCell.classList.add('host-cell');
+        
+        // 添加房主標記
+        const userInfo = bottomCenterCell.querySelector('.user-info');
+        if (userInfo && !userInfo.querySelector('.host-badge')) {
+          const badge = document.createElement('span');
+          badge.className = 'host-badge';
+          badge.textContent = '👑 指揮官';
+          userInfo.appendChild(badge);
+          console.log('已添加本地用戶房主標記');
+        }
+      }
     }
   
     // 暴露公共方法
@@ -193,7 +411,9 @@ const UIManager = (function() {
       removeUserFromCell,
       highlightUserCell,
       handleSoundPlayed,
-      getCellId // 新增的方法
+      getCellId,
+      forceRefreshCells,
+      ensureLocalUserCell  // 新增：確保本地用戶格子
     };
   })();
   

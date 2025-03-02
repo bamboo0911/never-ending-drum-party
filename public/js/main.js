@@ -1,4 +1,4 @@
-// 優化的主程序
+// 優化的主程序 - 增強房間同步功能
 (function() {
     // 應用狀態
     const appState = {
@@ -52,6 +52,11 @@
       if (window.SocketManager && window.SocketManager.currentUser) {
         window.SocketManager.currentUser.name = playerName;
         window.SocketManager.currentUser.drumType = instrument;
+        
+        // 確保設置用戶名
+        if (typeof window.SocketManager.setUserName === 'function') {
+          window.SocketManager.setUserName(playerName);
+        }
       }
       
       try {
@@ -81,11 +86,64 @@
           window.HostManager.init();
         }
         
+        // 設置定期同步房間用戶
+        setupRoomSync();
+        
         appState.initialized = true;
         console.log('應用初始化完成');
       } catch (error) {
         console.error('應用初始化失敗:', error);
         showError('初始化失敗，請重新整理頁面');
+      }
+    }
+    
+    /**
+     * 設置房間同步機制
+     */
+    function setupRoomSync() {
+      // 初始請求房間用戶（等待 2 秒確保加入房間完成）
+      setTimeout(() => {
+        if (window.SocketManager && typeof window.SocketManager.requestRoomUsers === 'function') {
+          console.log('初始請求房間用戶列表...');
+          window.SocketManager.requestRoomUsers();
+        }
+      }, 2000);
+      
+      // 設置定期同步（每 10 秒）
+      setInterval(() => {
+        if (window.SocketManager && typeof window.SocketManager.requestRoomUsers === 'function') {
+          console.log('定期同步房間用戶列表...');
+          window.SocketManager.requestRoomUsers();
+        }
+      }, 10000);
+      
+      // 監聽房間用戶更新事件
+      if (window.SocketManager) {
+        window.SocketManager.on('room-users', function(data) {
+          console.log('收到房間用戶更新:', data);
+          
+          // 觸發 UI 更新
+          if (window.UIManager && typeof window.UIManager.updateUserCells === 'function' && data.users) {
+            window.UIManager.updateUserCells(data.users);
+          }
+        });
+        
+        // 監聽強制同步事件
+        window.SocketManager.on('room-users-sync', function(data) {
+          console.log('收到強制房間同步:', data);
+          
+          // 觸發 UI 更新
+          if (window.UIManager && typeof window.UIManager.updateUserCells === 'function' && data.users) {
+            window.UIManager.updateUserCells(data.users);
+          }
+          
+          // 更新房主指示器
+          if (window.HostManager && typeof window.HostManager.updateHostIndicators === 'function' && data.hostId) {
+            setTimeout(() => {
+              window.HostManager.updateHostIndicators();
+            }, 300);
+          }
+        });
       }
     }
     
@@ -224,11 +282,18 @@
           }
         },
         onUserJoined: (data) => {
-            // 傳入完整的用戶物件（包含 name 與 drumType）
-            if (window.UIManager && data) {
-              window.UIManager.addUserToCell(data);
-            }
-          },
+          // 傳入完整的用戶物件（包含 name 與 drumType）
+          if (window.UIManager && data) {
+            window.UIManager.addUserToCell(data);
+          }
+          
+          // 請求完整的房間用戶列表
+          if (window.SocketManager && typeof window.SocketManager.requestRoomUsers === 'function') {
+            setTimeout(() => {
+              window.SocketManager.requestRoomUsers();
+            }, 500);
+          }
+        },
         onUserLeft: (data) => {
           if (window.UIManager && data && data.userId) {
             window.UIManager.removeUserFromCell(data.userId);
@@ -325,4 +390,41 @@
       }
       alert('錯誤: ' + message);
     }
+    
+    // 暴露一些有用的公共 API 到 window
+    window.DrumParty = {
+      forceSync: function() {
+        if (window.SocketManager && typeof window.SocketManager.requestRoomUsers === 'function') {
+          window.SocketManager.requestRoomUsers();
+          return '已请求同步房间成员';
+        }
+        return '无法同步，SocketManager不可用';
+      },
+      refreshUI: function() {
+        if (window.UIManager && typeof window.UIManager.forceRefreshCells === 'function') {
+          window.UIManager.forceRefreshCells();
+          return '已刷新UI';
+        }
+        return 'UIManager不可用';
+      },
+      debug: function() {
+        return {
+          appState,
+          socket: window.SocketManager ? {
+            connected: window.SocketManager.isConnected(),
+            room: window.SocketManager.currentRoom,
+            user: window.SocketManager.currentUser,
+            participants: window.SocketManager.getRoomParticipants ? 
+              window.SocketManager.getRoomParticipants() : 'unavailable'
+          } : 'SocketManager unavailable',
+          host: window.HostManager ? {
+            isHost: window.HostManager.isUserHost(),
+            hostId: window.HostManager.getCurrentHostId(),
+            isPlaying: window.HostManager.isCirclePlaying()
+          } : 'HostManager unavailable',
+          ui: window.UIManager ? 'available' : 'unavailable',
+          audio: window.AudioManager ? 'available' : 'unavailable'
+        };
+      }
+    };
   })();

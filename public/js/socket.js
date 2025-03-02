@@ -1,4 +1,4 @@
-// Simplified Socket Manager
+// Improved Socket Manager with better room synchronization
 const SocketManager = (function() {
     // Socket.io instance
     let socket;
@@ -10,7 +10,8 @@ const SocketManager = (function() {
     };
     // Current room info
     const currentRoom = {
-      id: 'default-room'
+      id: 'default-room',
+      users: []  // 存储房间用户列表
     };
     // Event listeners
     const eventListeners = {};
@@ -105,8 +106,15 @@ const SocketManager = (function() {
           console.error('[Socket] 房間數據無效:', data);
           return;
         }
+        
+        // 更新房間數據
+        currentRoom.users = data.users;
+        
         updateRoomInfo(`房間: ${currentRoom.id} (${data.users.length} 人在線)`);
         triggerCallback('onRoomJoined', data);
+        
+        // 觸發 room-joined 事件讓其他模塊知道
+        triggerCallback('room-joined', data);
       });
   
       // User joined
@@ -116,7 +124,25 @@ const SocketManager = (function() {
           console.error('[Socket] 用戶數據無效:', data);
           return;
         }
+        
+        // 添加用戶到房間列表
+        if (currentRoom.users) {
+          const userExists = currentRoom.users.some(u => u.id === data.userId);
+          if (!userExists) {
+            currentRoom.users.push({
+              id: data.userId,
+              name: data.name,
+              position: data.position,
+              drumType: data.drumType
+            });
+          }
+        }
+        
+        updateRoomInfo(`房間: ${currentRoom.id} (${currentRoom.users.length} 人在線)`);
         triggerCallback('onUserJoined', data);
+        
+        // 觸發 user-joined 事件讓其他模塊知道
+        triggerCallback('user-joined', data);
       });
   
       // User left
@@ -126,7 +152,17 @@ const SocketManager = (function() {
           console.error('[Socket] 用戶數據無效:', data);
           return;
         }
+        
+        // 從房間列表移除用戶
+        if (currentRoom.users) {
+          currentRoom.users = currentRoom.users.filter(u => u.id !== data.userId);
+        }
+        
+        updateRoomInfo(`房間: ${currentRoom.id} (${currentRoom.users ? currentRoom.users.length : 0} 人在線)`);
         triggerCallback('onUserLeft', data);
+        
+        // 觸發 user-left 事件讓其他模塊知道
+        triggerCallback('user-left', data);
       });
   
       // Drum hit
@@ -153,6 +189,45 @@ const SocketManager = (function() {
         }
         triggerCallback('onServerTime', data);
       });
+      
+      // Host assigned
+      socket.on('host-assigned', (data) => {
+        console.log('[Socket] 收到房主分配:', data);
+        triggerCallback('host-assigned', data);
+      });
+      
+      // Host status
+      socket.on('host-status', (data) => {
+        console.log('[Socket] 收到房主狀態:', data);
+        triggerCallback('host-status', data);
+      });
+      
+      // Host changed
+      socket.on('host-changed', (data) => {
+        console.log('[Socket] 收到房主變更:', data);
+        triggerCallback('host-changed', data);
+      });
+      
+      // Circle started
+      socket.on('circle-started', (data) => {
+        console.log('[Socket] 收到鼓圈開始:', data);
+        triggerCallback('circle-started', data);
+      });
+      
+      // Circle stopped
+      socket.on('circle-stopped', () => {
+        console.log('[Socket] 收到鼓圈停止');
+        triggerCallback('circle-stopped', {});
+      });
+      
+      // Room users
+      socket.on('room-users', (data) => {
+        console.log('[Socket] 收到房間用戶列表:', data);
+        if (data && Array.isArray(data.users)) {
+          currentRoom.users = data.users;
+          triggerCallback('room-users-updated', data);
+        }
+      });
     }
   
     /**
@@ -174,12 +249,15 @@ const SocketManager = (function() {
       socket.emit('join-room', {
         roomId: currentRoom.id,
         userId: currentUser.id,
-        name: currentUser.name,
+        name: currentUser.name || 'User-' + currentUser.id.substring(0, 5),
         drumType: currentUser.drumType
       });
   
       console.log(`[Socket] 正在加入房間: ${roomId}`);
       updateRoomInfo(`房間: ${roomId} (加入中...)`);
+      
+      // 清空當前房間用戶列表，等待服務器發送完整列表
+      currentRoom.users = [];
     }
   
     /**
@@ -275,6 +353,18 @@ const SocketManager = (function() {
       }
       currentUser.drumType = drumType;
     }
+    
+    /**
+     * Set current user's name
+     * @param {string} name - User name
+     */
+    function setUserName(name) {
+      if (!name) {
+        console.error('[Socket] 用戶名稱無效');
+        return;
+      }
+      currentUser.name = name;
+    }
   
     /**
      * Request server time
@@ -321,6 +411,9 @@ const SocketManager = (function() {
         console.warn('[Socket] 無法發送更換樂器事件: 未連接到服務器');
         return;
       }
+      
+      currentUser.drumType = newInstrument;
+      
       socket.emit('change-instrument', {
         userId: currentUser.id,
         drumType: newInstrument
@@ -337,6 +430,50 @@ const SocketManager = (function() {
         indicator.style.backgroundColor = isConnected ? 'green' : 'red';
       }
     }
+    
+    /**
+     * 發送特定事件到伺服器
+     * @param {string} eventName - 事件名稱
+     * @param {object} data - 事件數據
+     * @returns {boolean} 成功狀態
+     */
+    function emitEvent(eventName, data) {
+      if (!socket || !isConnected) {
+        console.warn(`[Socket] 無法發送 ${eventName} 事件: 未連接到服務器`);
+        return false;
+      }
+      
+      try {
+        socket.emit(eventName, data);
+        console.log(`[Socket] 已發送 ${eventName} 事件:`, data);
+        return true;
+      } catch (error) {
+        console.error(`[Socket] 發送 ${eventName} 事件失敗:`, error);
+        return false;
+      }
+    }
+    
+    /**
+     * 請求房間中的所有用戶
+     */
+    function requestRoomUsers() {
+      if (!socket || !isConnected) {
+        console.warn('[Socket] 無法請求房間用戶: 未連接到服務器');
+        return false;
+      }
+      
+      socket.emit('request-room-users');
+      console.log('[Socket] 已請求房間用戶列表');
+      return true;
+    }
+    
+    /**
+     * 獲取房間中的所有用戶
+     * @returns {Array} 用戶列表
+     */
+    function getRoomParticipants() {
+      return currentRoom.users || [];
+    }
   
     // Public API
     return {
@@ -346,9 +483,21 @@ const SocketManager = (function() {
       sendDrumHit,
       on,
       setDrumType,
+      setUserName,
       requestServerTime,
       isConnected: isSocketConnected,
-      changeInstrument
+      changeInstrument,
+      emitEvent,
+      requestRoomUsers,
+      getRoomParticipants,
+      // 暴露 socket 的接口方法 - 安全地訪問 socket
+      emit: function(eventName, data) {
+        if (!socket) {
+          console.warn(`[Socket] 無法發送 ${eventName}: socket 未初始化`);
+          return false;
+        }
+        return socket.emit(eventName, data);
+      }
     };
   })();
   
