@@ -76,6 +76,11 @@
         // 新增：設定更換樂器選單事件監聽
         setupInstrumentChange();
         
+        // 初始化房主管理器
+        if (window.HostManager) {
+          window.HostManager.init();
+        }
+        
         appState.initialized = true;
         console.log('應用初始化完成');
       } catch (error) {

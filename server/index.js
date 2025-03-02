@@ -3,6 +3,7 @@ const http = require('http');
 const socketIO = require('socket.io');
 const path = require('path');
 const socketEvents = require('./socket/events');
+const hostEvents = require('./socket/host-events');  // 新增
 
 // 建立 Express 應用和 HTTP 服務器
 const app = express();
@@ -19,6 +20,7 @@ app.get('/', (req, res) => {
 
 // 設定 Socket.io 事件處理
 socketEvents(io);
+hostEvents(io);  // 新增 Host 事件處理
 
 // 啟動服務器
 const PORT = process.env.PORT || 3000;

@@ -13,6 +13,60 @@ const MAX_USERS_PER_ROOM = 8;
 const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 分鐘
 
 /**
+ * 建立新房間
+ * @param {string} roomId - 房間識別碼
+ * @returns {Object} 新建立的房間物件
+ */
+function createRoom(roomId) {
+  const room = {
+    id: roomId,
+    users: new Map(),
+    gridPositions: new Map(),
+    hostId: null,         // 新增: 房主ID
+    isPlaying: false,     // 新增: 鼓圈是否正在進行
+    createdAt: Date.now(),
+    lastActivity: Date.now()
+  };
+  
+  rooms.set(roomId, room);
+  return room;
+}
+
+/**
+ * 指派房主
+ * @param {string} roomId - 房間識別碼
+ * @returns {string|null} 新房主ID或null
+ */
+function assignHost(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  
+  // 如果已有房主且房主仍在房間中，則保持不變
+  if (room.hostId && room.users.has(room.hostId)) {
+    return room.hostId;
+  }
+  
+  // 若無房主或房主已離開，選擇新房主
+  const participantIds = Array.from(room.users.keys());
+  if (participantIds.length === 0) {
+    room.hostId = null;
+    return null;
+  }
+  
+  // 隨機選擇一名玩家作為新房主
+  const newHostId = participantIds[Math.floor(Math.random() * participantIds.length)];
+  room.hostId = newHostId;
+  
+  // 通知房間內所有人新房主的變更
+  io.to(roomId).emit('host-changed', {
+    hostId: newHostId
+  });
+  
+  console.log(`房間 ${roomId} 的新房主為: ${newHostId}`);
+  return newHostId;
+}
+
+/**
  * 檢查房間是否已滿
  * @param {string} roomId - 房間識別碼
  * @returns {boolean} 若房間已滿則回傳 true
@@ -35,18 +89,11 @@ function isRoomFull(roomId) {
  */
 function joinRoom(roomId, userId, socketId, name, drumType) {
   // 如果房間不存在則建立
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, {
-      id: roomId,
-      users: new Map(),
-      gridPositions: new Map(),
-      createdAt: Date.now(),
-      lastActivity: Date.now()
-    });
+  let room = rooms.get(roomId);
+  if (!room) {
+    room = createRoom(roomId);
   }
 
-  const room = rooms.get(roomId);
-  
   // 更新房間活動時間
   room.lastActivity = Date.now();
   
@@ -56,36 +103,50 @@ function joinRoom(roomId, userId, socketId, name, drumType) {
     userInfo.socketId = socketId;
     return {
       position: userInfo.position,
-      users: Array.from(room.users.values())
+      users: Array.from(room.users.values()),
+      isHost: userId === room.hostId,
+      isPlaying: room.isPlaying
     };
   }
   
   let position;
   if (room.users.size === 0) {
-    // 第一位用戶：不分配 grid position，由客戶端自行置於中下方
     position = null;
   } else {
-    // 為新進用戶分配一個可用位置
     position = assignGridPosition(room);
   }
   
-  // 儲存用戶資訊，包含 name 與 drumType
+  // 儲存用戶資訊
   room.users.set(userId, {
     id: userId,
     socketId,
     position,
     joinedAt: Date.now(),
-    name,        // 新增玩家名稱
-    drumType     // 新增樂器類型
+    name,
+    drumType
   });
   
   if (position !== null) {
     room.gridPositions.set(position, userId);
   }
+
+  // 檢查房間是否需要指派房主
+  if (!room.hostId) {
+    room.hostId = userId;
+    io.to(socketId).emit('host-assigned', { isHost: true });
+    console.log(`用戶 ${userId} 作為首位加入者成為房間 ${roomId} 的房主`);
+  } else {
+    io.to(socketId).emit('host-status', { 
+      hostId: room.hostId,
+      isHost: userId === room.hostId 
+    });
+  }
   
   return {
     position,
-    users: Array.from(room.users.values())
+    users: Array.from(room.users.values()),
+    isHost: userId === room.hostId,
+    isPlaying: room.isPlaying
   };
 }
 
@@ -96,9 +157,8 @@ function joinRoom(roomId, userId, socketId, name, drumType) {
  * @returns {boolean} 回傳操作是否成功
  */
 function leaveRoom(roomId, userId) {
-  if (!rooms.has(roomId)) return false;
-  
   const room = rooms.get(roomId);
+  if (!room) return false;
   
   // 釋放該用戶所佔位置
   const user = room.users.get(userId);
@@ -109,6 +169,11 @@ function leaveRoom(roomId, userId) {
   // 移除用戶
   room.users.delete(userId);
   room.lastActivity = Date.now();
+  
+  // 檢查離開的是否為房主
+  if (userId === room.hostId) {
+    assignHost(roomId);
+  }
   
   // 若房間內無用戶則清除房間
   if (room.users.size === 0) {
@@ -124,21 +189,18 @@ function leaveRoom(roomId, userId) {
  * @returns {string|null} 分配到的位置，若無則回傳 null
  */
 function assignGridPosition(room) {
-  // 取得已使用的位置
   const usedPositions = new Set();
   for (const [position, userId] of room.gridPositions.entries()) {
     usedPositions.add(position);
   }
   
-  // 篩選可用位置
   const remainingPositions = availablePositions.filter(pos => !usedPositions.has(pos));
   
-  // 回傳第一個可用位置
   if (remainingPositions.length > 0) {
     return remainingPositions[0];
   }
   
-  return null; // 若無可用位置
+  return null;
 }
 
 /**
@@ -167,8 +229,41 @@ function getRoomInfo(roomId) {
     userCount: room.users.size,
     isFull: room.users.size >= MAX_USERS_PER_ROOM,
     createdAt: room.createdAt,
-    lastActivity: room.lastActivity
+    lastActivity: room.lastActivity,
+    hostId: room.hostId,
+    isPlaying: room.isPlaying
   };
+}
+
+/**
+ * 取得房間狀態
+ * @param {string} roomId - 房間識別碼
+ * @returns {Object|null} 房間狀態或null
+ */
+function getRoomState(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  
+  return {
+    isPlaying: room.isPlaying,
+    hostId: room.hostId
+  };
+}
+
+/**
+ * 更新房間狀態
+ * @param {string} roomId - 房間識別碼
+ * @param {Object} updates - 要更新的屬性
+ * @returns {boolean} 更新是否成功
+ */
+function updateRoomState(roomId, updates) {
+  const room = rooms.get(roomId);
+  if (!room) return false;
+  
+  Object.assign(room, updates);
+  room.lastActivity = Date.now();
+  
+  return true;
 }
 
 /**
@@ -189,7 +284,10 @@ function cleanupInactiveRooms() {
 // 每 30 分鐘清理一次
 setInterval(cleanupInactiveRooms, ROOM_CLEANUP_INTERVAL);
 
-// 取得房間統計資訊
+/**
+ * 取得房間統計資訊
+ * @returns {Object} 房間統計資訊
+ */
 function getRoomStats() {
   return {
     totalRooms: rooms.size,
@@ -197,7 +295,9 @@ function getRoomStats() {
       id: room.id,
       userCount: room.users.size,
       createdAt: room.createdAt,
-      lastActivity: room.lastActivity
+      lastActivity: room.lastActivity,
+      hostId: room.hostId,
+      isPlaying: room.isPlaying
     }))
   };
 }
@@ -208,5 +308,8 @@ module.exports = {
   getRoomUsers,
   getRoomInfo,
   isRoomFull,
-  getRoomStats
+  getRoomStats,
+  assignHost,
+  getRoomState,
+  updateRoomState
 };

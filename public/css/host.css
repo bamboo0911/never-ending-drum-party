@@ -1,0 +1,90 @@
+/* 房主控制區 */
+.host-controls {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 10px;
+    padding: 15px;
+    color: white;
+    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+  }
+  
+  /* 控制按鈕 */
+  .control-circle-btn {
+    background-color: #00B894;  /* 綠色 - 開始 */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    min-width: 150px;
+    transition: background-color 0.3s ease;
+  }
+  
+  .control-circle-btn:hover {
+    background-color: #009874;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* 播放中的按鈕樣式 */
+  .control-circle-btn.playing {
+    background-color: #ff5252;  /* 紅色 - 停止 */
+  }
+  
+  .control-circle-btn.playing:hover {
+    background-color: #e04242;
+  }
+  
+  /* 通知樣式 */
+  .host-notification {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    z-index: 2000;
+    font-size: 16px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    opacity: 1;
+    transition: opacity 0.5s ease;
+  }
+  
+  .host-notification.fade-out {
+    opacity: 0;
+  }
+  
+  /* 房主標籤 */
+  .host-badge {
+    display: inline-block;
+    background-color: #FDCC6E;
+    color: #2D3436;
+    font-size: 12px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    margin-left: 5px;
+    font-weight: bold;
+  }
+  
+  /* 響應式調整 */
+  @media (max-width: 768px) {
+    .host-controls {
+      top: 10px;
+      right: 10px;
+      padding: 10px;
+    }
+    
+    .control-circle-btn {
+      padding: 8px 16px;
+      font-size: 14px;
+      min-width: 120px;
+    }
+  }
