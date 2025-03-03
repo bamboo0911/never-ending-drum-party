@@ -7,7 +7,7 @@ const AudioManager = (function() {
     // 音頻緩衝區
     const audioBuffers = {};
     // 聲音類型
-    const soundTypes = ['kick', 'snare', 'hihat', 'tom', 'crash'];
+    const soundTypes = ['kick', 'snare', 'hihat', 'tom', 'crash', 'claves', 'conga', 'maracas', 'tambourine'];
     // 音頻已解鎖
     let isAudioUnlocked = false;
     // 每種聲音的預備數量
@@ -92,7 +92,7 @@ const AudioManager = (function() {
       document.addEventListener('touchstart', unlockAudio, false);
       document.addEventListener('touchend', unlockAudio, false);
       document.addEventListener('click', unlockAudio, false);
-      
+
       // 自動嘗試解鎖
       unlockAudio();
     }
@@ -159,6 +159,43 @@ const AudioManager = (function() {
             noiseMix: 0.6,
             metallic: true,
             shimmer: true // 閃爍效果
+          },
+          'claves': {
+            freqs: [2500, 2400], 
+            duration: 0.08, 
+            attack: 0.001, 
+            decay: 0.06,
+            resonance: 0.7,
+            snapEnhance: true,
+            woodiness: true // 木質感
+          },
+          'conga': {
+            freqs: [180, 170, 160], 
+            duration: 0.15, 
+            attack: 0.001, 
+            decay: 0.14,
+            resonance: 0.85,
+            skinResonance: true // 鼓皮共鳴
+          },
+          'maracas': {
+            freqs: [4000, 6000], 
+            duration: 0.12, 
+            attack: 0.001, 
+            decay: 0.1,
+            noise: true,
+            noiseMix: 0.95,
+            filter: {type: 'bandpass', freq: 5000, Q: 2},
+            shaker: true // 搖擺效果
+          },
+          'tambourine': {
+            freqs: [2000, 4000, 6000], 
+            duration: 0.2, 
+            attack: 0.001, 
+            decay: 0.18,
+            noise: true,
+            noiseMix: 0.4,
+            metallic: true,
+            jingles: true // 鈴片效果
           }
         };
         
@@ -188,7 +225,7 @@ const AudioManager = (function() {
      * @param {number} sampleRate - 採樣率
      */
     function generateEnhancedAudioData(data, config, sampleRate) {
-      const { freqs, attack, decay, noise, noiseMix, resonance, bassPunch, snapEnhance, metallic, pitchBend, shimmer } = config;
+      const { freqs, attack, decay, noise, noiseMix, resonance, bassPunch, snapEnhance, metallic, pitchBend, shimmer, woodiness, skinResonance, shaker, jingles } = config;
       const frameCount = data.length;
       
       // 主要音頻數據生成
@@ -261,6 +298,37 @@ const AudioManager = (function() {
           // 閃爍效果
           const shimmerEnv = Math.exp(-t / 0.1);
           sample += Math.sin(2 * Math.PI * (4000 + 2000 * Math.sin(2 * Math.PI * 10 * t)) * t) * 0.1 * shimmerEnv;
+        }
+        
+        // 木質感 (claves)
+        if (woodiness && t < 0.03) {
+          const woodEnv = Math.exp(-t / 0.01);
+          sample += Math.sin(2 * Math.PI * 3500 * t) * 0.2 * woodEnv;
+        }
+        
+        // 鼓皮共鳴 (conga)
+        if (skinResonance) {
+          const skinFreq = 150 + 50 * Math.exp(-t / 0.05);
+          sample += Math.sin(2 * Math.PI * skinFreq * t) * 0.15 * envelope;
+        }
+        
+        // 搖擺效果 (maracas)
+        if (shaker && t < 0.1) {
+          const shakerEnv = Math.exp(-t / 0.03);
+          for (let j = 0; j < 5; j++) {
+            const shakerTime = t + j * 0.005;
+            sample += (Math.random() * 2 - 1) * 0.2 * shakerEnv * Math.exp(-j);
+          }
+        }
+        
+        // 鈴片效果 (tambourine)
+        if (jingles) {
+          const jingleEnv = Math.exp(-t / 0.1);
+          for (let j = 0; j < 3; j++) {
+            const jingleTime = t + j * 0.01;
+            const jingleFreq = 6000 + j * 1000 + Math.random() * 500;
+            sample += Math.sin(2 * Math.PI * jingleFreq * jingleTime) * 0.1 * jingleEnv * Math.exp(-j);
+          }
         }
         
         // 應用包絡並在最終寫入前限制範圍

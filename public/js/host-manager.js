@@ -130,7 +130,7 @@ const HostManager = (function() {
         this.updateHostIndicators();
         
         if (state.isHost) {
-          this.showNotification('👑 你已成為鼓圈指揮官！');
+          this.showNotification('👑 You are the session host!');
         }
         
         // 更新調試信息
@@ -149,7 +149,7 @@ const HostManager = (function() {
         this.updateHostIndicators();
         
         if (state.isHost) {
-          this.showNotification('👑 你是鼓圈指揮官');
+          this.showNotification('👑 You are the session host!');
         }
         
         // 更新調試信息
@@ -168,12 +168,12 @@ const HostManager = (function() {
         
         // 如果變成了房主
         if (!wasHost && state.isHost) {
-          this.showNotification('👑 你已成為新的鼓圈指揮官！');
+          this.showNotification('👑 Become new host！');
         }
         // 如果看到別人成為房主
         else if (!state.isHost) {
           const hostName = this.getParticipantName(data.hostId) || `用戶 ${data.hostId}`;
-          this.showNotification(`👑 ${hostName} 成為鼓圈指揮官`);
+          this.showNotification(`👑 ${hostName} become the host`);
         }
         
         // 更新調試信息
@@ -345,9 +345,9 @@ const HostManager = (function() {
         
         // 立即提供視覺反饋
         if (action === 'start') {
-          this.showNotification('🎵 鼓圈開始！');
+          this.showNotification('🎵 Session Start！');
         } else {
-          this.showNotification('🛑 鼓圈停止');
+          this.showNotification('🛑 Session Stop');
         }
       },
       
@@ -397,7 +397,7 @@ const HostManager = (function() {
             if (!info.querySelector('.host-badge')) {
               const badge = document.createElement('span');
               badge.className = 'host-badge';
-              badge.textContent = '👑 指揮官';
+              badge.textContent = '👑 Session Host';
               info.appendChild(badge);
               console.log(`✅ 已將房主徽章添加到用戶 ${userId} 的名稱旁`);
             }
